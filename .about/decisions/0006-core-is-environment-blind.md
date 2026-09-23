@@ -3,7 +3,7 @@ status: Accepted
 date: 2026-09-23
 deciders: [k@wetware.works]
 history:
-  - 2026-09-23: Accepted — required by the no-bleed rule and by the intent to build in public while using privately
+  - 2026-09-23: Accepted — required so that loops run for different parties cannot read each other's learnings, and so the library can be public while its uses are private
 ---
 
 # Decision Record 0006: The core is environment-blind

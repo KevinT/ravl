@@ -31,17 +31,18 @@ core must enforce that without knowing who those parties are
 | Option | Why not |
 |---|---|
 | Configured trust scopes / allow-lists | Configuration drifts from placement; the core would need vocabulary for parties it must not know. |
-| Read anywhere (RavlGPT) | A shared store becomes a bleed path the moment two parties share a machine. |
+| Read anywhere (RavlGPT) | When two parties share a machine, a shared store lets one party's loops read the other's learnings. |
 | Read up as well as sideways/down | Everything in a subtree becomes visible to everything else; nested trees leak from root to leaf. |
 | **Chosen: sideways and down, self-write, placement-inferred** | Provable by inspection of a directory tree; supports emergent group behaviour without a global view. |
 
 ## Consequences
 
-- A group of loops can behave like a school: each reacts to its neighbours' steer, none
-  has a global view, coherence is emergent.
+- A group of loops can coordinate without any loop having a view of the whole group:
+  each reacts only to the steer of its siblings and descendants.
 - A parent cannot push steer down; see
   `0004-parents-develop-children-by-editing-spec` for how it influences children.
-- Deployment decides no-bleed by directory layout, and can prove it with `ls`.
+- A deployment separates groups of loops by directory layout, and can verify the
+  separation by listing the directories.
 
 ## Related
 

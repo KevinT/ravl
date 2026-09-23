@@ -1,52 +1,48 @@
 ---
 title: Principles of ravl
-description: The values the library must serve and the lines it must not cross — the axiology of ravl.
+description: The values the library must serve and the constraints it must not violate.
 tags: [ravl, principles, axiology]
 ---
 
 # Principles of `ravl`
 
-These are judgements, not mechanisms. When a design choice is unclear, it is settled
-here first, then in the mental model, then in code.
+These are value judgements, not mechanisms. When a design choice is unclear, it is
+settled against this list first, then against the mental model, then in code.
 
 ## Whom it serves
 
-1. **The owner of a loop is sovereign over what the loop is.** Intent, verifier,
-   gradient pins (`lock` / `never-lock`), decomposition and retirement belong to the
-   owner — a human, a tool-using agent, or a parent loop. The loop proposes; it never
-   decides these for itself.
-2. **Built for a real purpose first, a hypothetical never.** Every capability must trace
-   to a loop someone actually runs. Speculative generality is the weight this project
-   was rebuilt to shed.
-3. **Augment, do not replace.** A loop makes its owner faster and better informed. It
-   surfaces what it does not know as questions for the owner rather than guessing past
-   them.
+1. **The owner of a loop has sole authority over what the loop is.** Intent, verifier,
+   execution-mode settings (`lock`, `never-lock`), splitting, merging and retirement
+   are the owner's decisions. The owner may be a human, an LLM-driven agent, or a
+   parent loop. The loop proposes these changes; it does not make them.
+2. **Every capability is justified by a loop someone actually runs.** Capabilities
+   built for hypothetical use are not added.
+3. **The library assists the owner; it does not replace the owner's judgement.** When
+   a loop lacks information, it writes a question for the owner rather than guessing.
 
-## What it must never do
+## Constraints
 
-4. **Never retry inside a run.** One attempt per run is the unit of feedback. A loop is
-   a tool that longer-running processes call, not a long-running process itself.
-5. **Never write another loop's learnings.** Self-write only. Reading is sideways and
-   down, never up.
-6. **Never mix the two kinds of knowledge.** What a loop learns about its *domain* and
-   what it learns about *making its own machinery work* are kept apart in storage, in
-   diagnosis and in how they steer the next run.
-7. **Never know its environment.** No knowledge store, organisation, host or agent
-   runtime is named in the core. Surfaces and resources are handed in.
-8. **Never leak a user.** No private user's loop names, domain content or run artefacts
-   may enter this repository, including its history.
+4. **No retry inside a run.** One attempt per run. A loop is a tool that a
+   longer-running process may call; it is not itself a long-running process.
+5. **No writes to another loop's learnings.** A loop writes only into its own
+   directory. It reads from siblings and descendants, never from ancestors.
+6. **Domain knowledge and execution knowledge are kept separate** in storage, in
+   diagnosis, and in how each is used on the next run.
+7. **The core names no environment.** No knowledge store, organisation, host or agent
+   runtime appears in the core. Surfaces and resources are supplied at run time.
+8. **No private user's content enters this repository**, including its history: no
+   loop names, domain content or run artefacts from anyone's actual use of `ravl`.
 
-## How it must behave
+## Behaviour
 
-9. **Trust is placement.** Which loops may inform each other is decided by where they
-   sit on the filesystem, and by nothing else.
-10. **Human-readable everything.** Intent and verifier in plain language; learnings,
-    traces and steer in formats a person can open and understand without tooling.
-11. **Cost is a first-class observation.** Every run records what it consumed. The case
-    for crystallising a loop into code is made with these numbers.
-12. **The core is small.** Anything that a capable model can do at run time from a clear
-    contract is not written as framework code. Framework code exists for the things a
-    model must not be trusted to improvise: the phase contract, the learning store and
-    its trust topology, the verification harness, the safety boundaries.
-13. **Say "LLM", not "AI".** The object is a large language model; the library
-    describes what it does with one.
+9. **Read permissions between loops are determined by directory placement** and by
+   nothing else.
+10. **Every file is human-readable.** Intent and verifier are plain language. Learnings,
+    traces and steer use formats a person can open and read without tooling.
+11. **Every run records its cost**: tokens by model, wall time, network calls, compute.
+    The decision to generate code for a loop is made using these figures.
+12. **The core is small.** Work that a capable LLM can perform at run time from a clear
+    contract is not implemented as library code. Library code exists for the parts an
+    LLM must not be allowed to improvise: the phase contract, the learning store and its
+    read/write rules, the verification harness, and the safety boundaries.
+13. **Use "LLM", not "AI".** The technical object is a large language model.

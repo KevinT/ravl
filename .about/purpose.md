@@ -18,7 +18,7 @@ Verify, Learn.
   kept whole as evidence: its documents, run artefacts and self-diagnoses show what the
   idea achieved and where it fell short. `ravl` re-derives the concepts against a stated
   mental model; it ports none of the earlier code.
-- **Downstream — anyone's loops.** `ravl` is consumed by people and by tool-using agents
+- **Downstream — anyone's loops.** `ravl` is consumed by people and by LLM-driven agents
   who write loops in plain language and run them. The primary customer is the author,
   working backwards from real purposes. It is built in public so others can contribute.
 - **Sideways — distribution surfaces.** A command-line tool, an agent skill, a

@@ -32,7 +32,7 @@ derivation to honour it.
 | Option | Why not |
 |---|---|
 | Keep execution learnings as prompt context (RavlGPT) | Demonstrated not to close the loop. |
-| Enforce domain learnings mechanically too | Domain knowledge is judgement; enforcing it removes the adaptivity the agentic end of the gradient exists for. |
+| Enforce domain learnings mechanically too | Domain learnings are judgements about the subject matter. Enforcing them removes the ability of an LLM-driven run to adapt, which is the reason that mode exists. |
 | **Chosen: execution = constraint, domain = context** | Matches the problem/solution split; makes the one class of learning that is mechanically checkable actually checked. |
 
 ## Consequences
@@ -42,4 +42,4 @@ derivation to honour it.
 
 ## Related
 
-- `0002-determinism-gradient-learned-and-declarable`
+- `0002-execution-mode-learned-and-owner-settable`

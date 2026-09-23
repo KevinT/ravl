@@ -1,242 +1,253 @@
 # A RAVL loop — the mental model
 
-> How to reason about a loop: what it is, where it sits on the determinism gradient,
-> how it learns, whom it trusts, and who owns it. Read this before writing a loop,
-> reading one's learnings, or changing the library.
+> How to reason about a loop: what it is, how it moves between LLM-driven and
+> code-driven execution, how it learns, which other loops it may read, and who owns it.
+> Read this before writing a loop, reading a loop's learnings, or changing the library.
 
 ## The four phases
 
 ```
 REFLECT ──► ACT ──► VERIFY ──► LEARN
- observe     do      check      steer
 ```
 
-| Phase | Does | Must not |
+| Phase | Does | Does not |
 |---|---|---|
-| **Reflect** | Gather the current state of the world, the resource inventory for this run, and every piece of *steer* addressed to this loop. Synthesise them into context. | Decide or act. |
-| **Act** | Apply bounded agency toward the intent — by a model acting directly, by crystallised code, or a mix. Produce the **effect**. | Re-gather, verify, or learn. |
-| **Verify** | Judge the effect against the owner's criteria. Judge *domain* quality only; the run trace already knows whether the machinery worked. | Take new actions or update anything. |
-| **Learn** | Attribute what happened, decide whether the loop moves on the gradient, and write **steer** for named readers. | Act, re-analyse the world, or write outside its own loop. |
+| **Reflect** | Reads the current state of the world, the resource inventory for this run, and every steer entry addressed to this loop. Produces the context for Act. | Decide or act. |
+| **Act** | Performs the work described by the intent, either by an LLM acting directly, by generated code, or by a combination. Produces the **effect**. | Re-read the world, verify, or learn. |
+| **Verify** | Compares the effect against the owner's criteria. Judges domain quality only. Whether the machinery worked is already recorded in the trace. | Take new actions or update anything. |
+| **Learn** | Classifies what happened, decides whether the loop's execution mode changes, and writes **steer** for named readers. | Act, re-analyse the world, or write outside its own loop directory. |
 
-One run = one pass through the four phases. Nothing loops back inside a run.
+One run is one pass through the four phases. There is no branch back to an earlier
+phase inside a run.
 
 ## Axioms
 
-### A1 — A loop is a purpose with a verifier, developed by running it
+### A1 — A loop is an intent plus a verifier, and is developed by running it
 
-The owner holds two things: the **intent** (what good looks like) and the
-**verifier** (how we would know). Everything else — structure, code, strategy — is
-derived from those two and can be thrown away and re-derived.
+The owner holds two things: the **intent** (a description of the wanted outcome) and
+the **verifier** (the criteria that decide whether the outcome was achieved).
+Everything else — structure, generated code, strategy — is derived from those two and
+can be deleted and re-derived.
 
-The spec is grown, not written once. Run on bare intent; see where it drifts; sharpen
-the intent, add a verification; run again — until it passes consistently. This is
-red–green–refactor in plain language. The library's job is to make each turn of that
-cycle fast and to show the owner clearly what it understood.
+The specification is developed incrementally. The owner runs the loop on a bare intent,
+reads the result, sharpens the intent or adds a verification criterion, and runs again,
+until the loop passes consistently. This is the red–green–refactor cycle applied to a
+plain-language specification. The library's job is to make each cycle fast and to show
+the owner what it understood from the specification.
 
-The owner may be a human or a tool-using agent. Nothing below distinguishes them.
+The owner may be a human or an LLM-driven agent. Nothing below distinguishes them.
 
-### A2 — Position on the determinism gradient is learned and declarable
+### A2 — Execution mode is learned, and the owner may fix it
+
+Each loop has an **execution mode** on a scale from *LLM-driven* to *code-driven*:
 
 ```
- agentic ─────────────────────────────────────────► crystallised
- a model acts directly                               generated code runs; no model
- slow · costly · adaptive · non-deterministic         fast · cheap · rigid · deterministic
+ LLM-driven ─────────────────────────────────────► code-driven
+ an LLM performs Act directly                       generated code performs Act; no LLM call
+ slow, costly, adaptive, non-deterministic          fast, cheap, fixed, deterministic
 ```
 
-Every loop is somewhere on this line, and moves:
+Learn moves the loop along this scale:
 
-- **Rightward** (crystallise) when Verify keeps passing, the procedure is repeatable,
-  and the agentic path costs more than the outcome warrants.
-- **Leftward** (de-crystallise) when Verify fails on crystallised code *and* the fault is
-  attributed to the solution, not the world. A model re-enters and re-derives.
+- **Toward code-driven** when Verify has passed on consecutive runs, the procedure is
+  the same from run to run, and the LLM-driven path costs more than the outcome
+  justifies. Learn generates code that performs Act.
+- **Toward LLM-driven** when Verify fails on generated code and Learn attributes the
+  failure to the solution rather than to the external world. An LLM performs the next
+  Act and new code may be generated from it.
 
-The owner may **pin** the position at either end:
+The owner may set the mode explicitly:
 
-- `lock` — "I got the outcome I wanted; do exactly this." A legitimate answer even when
-  the intent was under-specified: the outcome was right, and that is what is kept.
-- `never-lock` — the purpose is inherently non-repeatable; judgement is required every
-  run.
+- `lock` — run the current generated code unchanged every time. This is a valid choice
+  when an LLM-driven run produced the wanted outcome but the intent was not specific
+  enough to reproduce it reliably.
+- `never-lock` — always perform Act with an LLM, because the task requires judgement on
+  every run.
 
-A declaration always overrides an inference. Crystallisation is a *learned property* of
-the loop that the owner can overrule, not a manual mode.
+An explicit setting always overrides the learned mode.
 
 ### A3 — One attempt per run
 
-The loop is the smallest possible observe → act → check → learn cycle, so that feedback
-is immediate and every failure is visible as a failure. There is no internal retry.
+A run performs each phase once and stops. There is no retry, backoff or repeat inside a
+run. A failed run is recorded and becomes input to the next run. This keeps each
+failure visible as a failure, and keeps the delay between an action and its feedback as
+short as possible.
 
-Longer behaviour is composition: a loop's Act may invoke other loops. A loop is a tool
-that long-running agents call, not a long-running process. A group of loops (see A7)
-may exhibit long-running behaviour collectively; no single loop does.
+Longer-running behaviour is built by composition: a loop's Act may invoke other loops.
+A loop is a tool that a long-running agent can call; it is not itself a long-running
+process.
 
-### A4 — Two kinds of knowledge, never mixed
+### A4 — Domain knowledge and execution knowledge are stored and used separately
 
-| | Domain learning (problem space) | Execution learning (solution space) |
+| | Domain learning | Execution learning |
 |---|---|---|
-| **About** | What is true of the task and its world | What makes the machinery of *this loop* work |
-| **Example** | "Fixture data lags the match by ~6h" | "This package is published as `scikit-learn`, not `sklearn`" |
+| **Concerns** | Facts about the task and its subject matter | Facts about making this loop's machinery work |
+| **Example** | "Fixture data is published about six hours after the match" | "The package is published as `scikit-learn`, not `sklearn`" |
 | **Written by** | Learn, from Verify's judgement | Learn, from the run trace |
-| **Read by** | Reflect, to shape context for Act | The generation contract, as a **constraint** |
+| **Used by** | Reflect, as context for Act | The code-generation step, as a **constraint** that a generated program must satisfy |
 
-Execution learnings are constraints injected into how the next Act is derived, not
-hints offered to a prompt. A known answer that is not enforced is a failure of the
-library, not of the model.
+Execution learnings are enforced when code is generated. A generated program that
+violates a recorded execution constraint is rejected before it runs. Domain learnings
+are supplied as context and are not mechanically enforced.
 
-Both kinds are recorded as context alongside the loop by default; configuration may
-relocate them. They are never stored in the same file.
+Both kinds are stored beside the loop by default. Configuration may relocate them. They
+are never stored in the same file.
 
-### A5 — The core knows nothing of its environment; each run knows its resources
+### A5 — The core has no knowledge of its environment; each run receives a resource inventory
 
-The library never names a knowledge store, an organisation, a host or an agent runtime.
-**Surfaces** (a CLI, an agent skill, a tool-call) and **resources** (files, APIs, a
-memory system reached over MCP) are derivatives on the boundary of the core, handed in
-at run time.
+The library does not name any knowledge store, organisation, host or agent runtime.
+**Surfaces** (a command-line tool, an agent skill, a tool-call interface) invoke the
+core. **Resources** (files, APIs, a memory system reached over MCP) are passed to a run
+as an inventory by the surface that invoked it.
 
-Each run receives a **resource inventory** and reasons over it — including whether a
-resource not yet used might improve the result. Resource relevance is itself learned:
-an agentic run considers every resource in the inventory; as the loop crystallises,
-Learn records which resources actually contributed and the crystallised code binds only
-to those. Crystallisation is subtraction. A loop that fetches a sports score does not
-consult a memory system on every run because it once learned that doing so added nothing.
+Reflect reads the inventory and may use any resource in it, including one that earlier
+runs did not use. Learn records which resources contributed to a passing run. When the
+loop becomes code-driven, the generated code uses only the resources that contributed.
+This is how a loop that fetches a sports score stops consulting a memory system on
+every run: an earlier run recorded that the memory system contributed nothing.
 
-### A6 — Three write channels; only Learn writes meaning
+### A6 — Three write channels
 
 | Channel | Written by | Content | Purpose |
 |---|---|---|---|
-| **Effect** | Act | The loop's actual purpose — the file, the report, the API call | The reason the loop exists |
-| **Trace** | The runtime, every phase | Raw record of what happened, including partial state on stall or crash; the **cost ledger** | Audit and forensics |
-| **Steer** | Learn only | Synthesised guidance, each item addressed to a specific reader | The next run's context |
+| **Effect** | Act | The loop's output: a file, a report, an API call | The reason the loop exists |
+| **Trace** | The runtime, in every phase | A record of what happened, including partial state if a phase stalled or crashed, and the **cost ledger** for the run | Audit and diagnosis |
+| **Steer** | Learn only | Guidance for the next run, each entry addressed to a named reader | Input to the next Reflect |
 
-The trace is what survives a crash. A run that dies in Act still leaves "attempt 7 died
-here, doing this" for the next Reflect. Learn is the only phase permitted to say what a
-run *means*.
+The trace is written incrementally, so a run that crashes during Act still leaves a
+record of where it crashed and what it was doing. Learn is the only phase that writes
+interpretation.
 
-Steer has three addressees:
+Steer entries have three possible addressees:
 
-| Addressee | Learn leaves | Which answers |
+| Addressee | Content | Question it answers for the reader |
 |---|---|---|
-| **This loop's next Reflect** | Attribution, gradient move, resource relevance, sharpened focus | "What do I do differently this time?" |
-| **The parent's Reflect** | Outcome summary and open questions for the owner | "Is this child healthy; what does it need from me?" |
-| **Siblings' Reflect** | Domain patterns tagged portable vs local | "Does something learned over there apply here?" |
+| **This loop's next Reflect** | Failure classification, mode change, resource relevance, what to focus on | What to do differently on this run |
+| **The parent loop's Reflect** | Outcome summary and open questions for the owner | Whether this child needs an owner decision |
+| **Sibling loops' Reflect** | Domain patterns tagged as portable or local | Whether a pattern learned elsewhere applies here |
 
-Two rules inside A6:
+Two rules apply inside Learn:
 
-- **Attribution before adjustment.** Every failure is classed **world** (API down, data
-  absent, transient) or **solution** (approach wrong) before any gradient move. World
-  failures never de-crystallise. Solution failures on crystallised code pull left.
-  Solution failures on agentic runs sharpen the spec — and raise a question for the owner
-  if the ambiguity is theirs to resolve.
-- **Steer is small and addressed.** Raw artefacts stay in the trace. What flows forward
-  reads like "priority: X; avoid: Y; resource Z was irrelevant" — never five failure logs.
+- **Classify the failure before changing anything.** Every failure is classified as
+  **world** (external service down, data absent, transient error) or **solution** (the
+  approach was wrong). World failures do not change the execution mode. Solution
+  failures on generated code move the loop toward LLM-driven. Solution failures on an
+  LLM-driven run sharpen the specification, and produce a question for the owner when
+  the ambiguity is in the intent.
+- **Steer is short and addressed.** Raw output stays in the trace. Steer states what to
+  prioritise, what to avoid, and which resources were irrelevant.
 
-### A7 — Learning topology is inferred from placement
+### A7 — Which loops may read each other is determined by directory placement
 
 ```
 parent/
-  ravl_loop.md            reads: own + descendants' steer
-  child_a/  ravl_loop.md  reads: own + siblings' (child_b) steer
-  child_b/  ravl_loop.md  reads: own + siblings' (child_a) steer
+  ravl_loop.md            reads steer from: itself, all descendants
+  child_a/  ravl_loop.md  reads steer from: itself, child_b
+  child_b/  ravl_loop.md  reads steer from: itself, child_a
 ```
 
-- **Write:** self only, always.
-- **Read:** sideways (siblings — loops sharing a parent directory) and down
-  (descendants). **Never up.**
-- Reading siblings is expected, not merely permitted: sibling steer is an input to
-  Reflect.
+- **Write:** a loop writes learnings only into its own directory.
+- **Read:** a loop reads learnings from its siblings (loops sharing its parent
+  directory) and from its descendants. It does not read from any ancestor.
+- Sibling steer is an input to Reflect, not an optional extra.
 
-Because trust is placement, two groups that must never inform each other are never
-placed under a common parent, and the core needs no vocabulary for who they are.
+Two groups of loops that must not inform each other are placed so that they share no
+parent directory. The core does not need to know what the groups are.
 
-**How a parent influences a child.** Steer never flows down. A parent that learns
-something its children should know acts as their **owner**: on its next Act it edits
-the children's *specification* (intent or verifier). Development flows down;
-evidence flows up. This is the default; a deployment may switch it off.
+**How a parent influences its children.** Steer does not flow from parent to child. A
+parent that learns something its children should act on edits the children's
+specification (intent or verifier) during its next Act, in the same way a human owner
+would. This behaviour is on by default and can be disabled in configuration.
 
-This topology is what allows a group of loops to behave like a school: each reacts to
-its neighbours' steer, none has a global view, and coherence is emergent.
+This arrangement lets a set of loops coordinate without any loop having a view of the
+whole set: each reacts to the steer of its siblings and descendants only.
 
 ### A8 — Every loop has exactly one owner
 
-The owner is whoever holds the intent and verifier. It is inferred from placement: a
-loop under a parent directory is owned by that parent loop; a root loop is owned by
-whoever runs it (a human or an agent). No registry, no config field.
+The owner is whoever holds the loop's intent and verifier. Ownership is determined by
+placement: a loop inside a parent loop's directory is owned by that parent; a root loop
+is owned by whoever runs it, human or agent. There is no owner field and no registry.
 
-Only the owner may: change intent or verifier; pin the gradient (`lock`, `never-lock`);
-decompose or merge; retire. The loop's role in all of these is to **propose**, as
-questions addressed to its owner. A parent loop, being an agent, may decide at once; a
-human decides on their own cadence. Same mechanism, different latency.
+Only the owner may: change the intent or verifier; set `lock` or `never-lock`; split
+or merge the loop; retire it. For each of these the loop's role is to **propose**, as a
+question in its steer addressed to the owner. It never applies the change to itself.
 
-A consequence: a group of loops cannot restructure itself from the bottom. Leaves
-propose, parents decide, and the root's owner decides for the root.
+A parent loop, being an agent, may act on a proposal at its next Act. A human acts when
+they choose. The mechanism is the same; only the delay differs.
 
 ## The decision framework
 
-The questions a loop asks itself, in the order it asks them.
+The questions a loop evaluates, in order.
 
-### On every run, Reflect asks
+### On every run, Reflect evaluates
 
-1. **Where am I on the gradient, and was that declared or learned?** Declared wins.
-2. **What steer is addressed to me?** Own last Learn; siblings'; descendants'. Nothing
-   from above.
-3. **What is in this run's resource inventory, and which resources have past runs
-   actually used?** Agentic → consider all. Crystallised → the bound set only.
-4. **Did the last run complete?** A stall or crash in the trace is the first fact of
-   this run, not a gap in learning.
+1. **What is the execution mode, and was it set by the owner or learned?** An owner
+   setting wins.
+2. **Which steer entries are addressed to me?** From this loop's last Learn, from
+   siblings, from descendants. None from ancestors.
+3. **What is in this run's resource inventory, and which resources did earlier passing
+   runs use?** LLM-driven: consider every resource. Code-driven: use the recorded set.
+4. **Did the last run complete?** A stall or crash recorded in the trace is the first
+   input to this run.
 
-### After Verify, Learn asks — in order, skipping nothing
+### After Verify, Learn evaluates, in order, without skipping
 
-5. **Did the run complete, and did the effect happen?** From the trace. A crash is an
-   execution fact before it is anything else.
-6. **Did Verify pass?** If there is no verifier yet, say so: this is a red-phase loop
-   still being grown (A1), not an unhealthy one.
-7. **If not — world or solution?** Attribution first (A6). World → record; no move.
-   Solution → continue.
-8. **If solution — is the fault in the spec or in the derivation?** Ambiguous intent →
-   raise a question to the owner; no move. Wrong derivation → pull left; a model
-   re-derives next run.
-9. **If passed — is this loop repeatable enough to move right?** Four signals:
-   consecutive passes; run-to-run variance of the *effect* for like inputs; stability of
-   the inputs between runs; and **cost of the agentic path** (tokens by model, latency,
-   network calls, compute). Data may vary while the procedure does not — crystallise the
-   procedure, not the answer.
-10. **Should this loop never lock?** If repeatability fails to converge over many runs,
-    propose `never-lock` to the owner rather than trying forever.
-11. **Which resources contributed?** Mark relevance; crystallisation binds only to these.
-12. **Is this loop two loops?** Signals: one part converges right while another stays
-    left; verification criteria that fail independently of one another. Propose a split
-    to the owner. Never restructure the filesystem.
-13. **What here is portable to siblings, and what is local?** Tag before writing steer.
-14. **If I have children — does their collective steer imply a spec change?** Then the
-    next Act edits their specification (A7). Deployment may disable.
+5. **Did the run complete, and was the effect produced?** Read from the trace.
+6. **Did Verify pass?** If no verifier is defined yet, record that. A loop without a
+   verifier is in the red phase of development (A1), not in a failed state.
+7. **If Verify failed: world or solution?** World: record it, make no mode change.
+   Solution: continue.
+8. **If solution: is the fault in the specification or in the derivation?** Ambiguous
+   intent: write a question to the owner; make no mode change. Wrong derivation: move
+   toward LLM-driven so the next Act re-derives.
+9. **If Verify passed: is the loop ready to move toward code-driven?** Four signals:
+   the number of consecutive passes; how much the effect varies between runs with
+   similar inputs; how much the inputs vary between runs; and the cost of the LLM-driven
+   path from the cost ledger (tokens by model, wall time, network calls, compute). Input
+   data may vary while the procedure stays the same; in that case generate code for the
+   procedure.
+10. **Should this loop be `never-lock`?** If repeatability has not converged after many
+    runs, propose `never-lock` to the owner instead of continuing to test for it.
+11. **Which resources contributed to this run?** Record relevance. Generated code uses
+    only these.
+12. **Is this one loop or two?** Signals: one part of the work has become repeatable
+    while another has not; verification criteria that fail independently of each other.
+    Propose a split to the owner. Do not change the directory structure.
+13. **Which of this run's domain learnings apply to siblings, and which are local?** Tag
+    each before writing steer.
+14. **If this loop has children: does their combined steer imply a specification
+    change?** If so, the next Act edits the child specification (A7). Deployment may
+    disable this.
 
-### Questions a loop never asks
+### Questions a loop does not evaluate
 
-- "Should I retry now?" (A3)
-- "May I write into that loop's learnings?" (A7)
-- "What does the loop above me know?" (A7)
-- "Was the domain output good?" — while the run is an execution failure (A4)
-- "Should I split myself / lock myself forever?" — it proposes; the owner decides (A8)
+- Whether to retry now (A3).
+- Whether to write into another loop's learnings (A7).
+- What an ancestor loop has learned (A7).
+- Whether the domain output was good, when the run failed for an execution reason (A4).
+- Whether to split itself or set its own mode permanently — it proposes, the owner
+  decides (A8).
 
 ## Reading a loop's directory
 
 ```
 my_loop/
-  ravl_loop.md        the owner's intent and verifier — the only thing the owner edits by hand
-  config/             declarations: gradient pins, learning-store location, overrides
+  ravl_loop.md        intent and verifier; the only file the owner edits by hand
+  config/             owner settings: execution mode, learning-store location, overrides
   learnings/
-    domain/           what is true of the task (A4)
-    execution/        what makes this loop's machinery work (A4)
+    domain/           facts about the task (A4)
+    execution/        constraints on generated code (A4)
     steer/            addressed guidance from the last Learn (A6)
-  runs/               one directory per attempt: trace, cost ledger, effect manifest
-  child_a/            a child loop — owned by my_loop (A8), reads its siblings (A7)
+  runs/               one directory per run: trace, cost ledger, list of effects produced
+  child_a/            a child loop, owned by my_loop (A8), which reads its siblings (A7)
 ```
 
-Owner-edited content is at the top. Everything below `learnings/` and `runs/` is the
-library's, regenerable, and safe to delete.
+The owner edits `ravl_loop.md` and `config/`. `learnings/` and `runs/` are written by
+the library and can be deleted; the loop will rebuild them over subsequent runs.
 
 ## Related
 
 - What this repository is a part of: [`../../purpose.md`](../../purpose.md)
-- Where it sits on the stack: [`../../situates.md`](../../situates.md)
+- Position on the alignment stack: [`../../situates.md`](../../situates.md)
 - The values behind these axioms: [`../../principles.md`](../../principles.md)
-- Decisions that fixed the open forks: [`../../decisions/`](../../decisions/README.md)
+- Decision records: [`../../decisions/`](../../decisions/README.md)

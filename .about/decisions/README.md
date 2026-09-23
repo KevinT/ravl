@@ -23,9 +23,9 @@ force, nearest scope first.
 |---|---|---|
 | [`0000-rebuild-from-concepts-not-from-code`](0000-rebuild-from-concepts-not-from-code.md) | Accepted | `ravl` re-derives RavlGPT's concepts in a new repository; no code is ported |
 | [`0001-one-attempt-per-run`](0001-one-attempt-per-run.md) | Accepted | A run never retries; failures are the next run's context |
-| [`0002-determinism-gradient-learned-and-declarable`](0002-determinism-gradient-learned-and-declarable.md) | Accepted | Loops crystallise toward code and pull back on solution-attributed failure; owners may pin either end |
+| [`0002-execution-mode-learned-and-owner-settable`](0002-execution-mode-learned-and-owner-settable.md) | Accepted | A loop moves from LLM-driven to code-driven execution as it proves repeatable, and back on solution failure; the owner may set the mode |
 | [`0003-trust-is-placement`](0003-trust-is-placement.md) | Accepted | Read sideways and down, write self only; trust inferred from filesystem orientation |
-| [`0004-parents-develop-children-by-editing-spec`](0004-parents-develop-children-by-editing-spec.md) | Accepted | Steer never flows down; a parent changes a child's specification instead (default on, config off) |
+| [`0004-parents-develop-children-by-editing-spec`](0004-parents-develop-children-by-editing-spec.md) | Accepted | A parent does not pass steer to its children; it edits their specification instead (default on, config off) |
 | [`0005-structural-change-is-proposed-by-loop-decided-by-owner`](0005-structural-change-is-proposed-by-loop-decided-by-owner.md) | Accepted | Lock, never-lock, split, merge, retire belong to the owner; the loop proposes |
 | [`0006-core-is-environment-blind`](0006-core-is-environment-blind.md) | Accepted | No knowledge store, organisation, host or runtime is named in the core; surfaces and resources are handed in |
 | [`0007-execution-learnings-are-generation-constraints`](0007-execution-learnings-are-generation-constraints.md) | Accepted | Execution knowledge is enforced on derivation, not offered as a hint |

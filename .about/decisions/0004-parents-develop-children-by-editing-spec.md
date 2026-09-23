@@ -16,7 +16,7 @@ rate limit" — yet no steer can reach them. Three routes were considered.
 
 ## Decision
 
-1. Steer **never flows down**. A parent influences its children only as their
+1. A parent **does not pass steer to its children**. A parent influences its children only as their
    **owner**: on its next Act it edits a child's specification — its intent or its
    verifier — exactly as a human developing a loop would.
 2. This is the same red–green–refactor mechanism the mental model describes (A1),
@@ -31,7 +31,7 @@ rate limit" — yet no steer can reach them. Three routes were considered.
 |---|---|
 | Children may read the parent's steer | Makes reading up/down/sideways universal within a subtree; nested trees leak root to leaf. |
 | Parent writes steer into children's directories | Violates self-write; makes provenance of a child's learnings ambiguous. |
-| **Chosen: parent edits child spec, default on / config off** | Keeps `0003` intact; owner semantics (`0005`) fall out for free; a full run-cycle slower, which is acceptable. |
+| **Chosen: parent edits child spec, default on / config off** | Keeps `0003` intact; uses the owner mechanism defined in `0005` with no additional mechanism; the change reaches the child one run-cycle later, which is acceptable. |
 
 ## Consequences
 

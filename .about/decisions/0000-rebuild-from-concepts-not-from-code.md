@@ -41,10 +41,10 @@ integration code from a private user of the framework had accumulated inside the
 
 | Option | Why not |
 |---|---|
-| Refactor RavlGPT in place | No test net to refactor against; most of the mass is exactly the weight to shed; a refactor of that size is a rewrite wearing a refactor's clothes. |
+| Refactor RavlGPT in place | The test suite does not cover the core, so there is nothing to refactor against. Most of the code is the part to be removed. A change of that size is a rewrite. |
 | Branch of RavlGPT | Shares no files with `main`, so gains nothing from branching, but inherits a history containing private-user artefacts and invites reuse of modules that should not survive. |
 | Continue RavlGPT under the same name | "GPT" describes a 2023 vendor product, not the thing; the protocol name is the product. |
-| **Chosen: new repository, concepts as documents** | Provable no-bleed from the first commit; small core; RavlGPT preserved as evidence. |
+| **Chosen: new repository, concepts as documents** | The repository history contains no private-user content from the first commit; the core is small; RavlGPT is preserved as evidence. |
 
 ## Consequences
 

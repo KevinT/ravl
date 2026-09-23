@@ -20,7 +20,7 @@ afterwards, or propose and wait. The answer required naming who decides.
    inferred from placement — a loop under a parent directory is owned by that parent
    loop; a root loop is owned by whoever runs it, human or agent. There is no owner
    field or registry.
-2. Only the owner may: change intent or verifier; pin the gradient (`lock`,
+2. Only the owner may: change intent or verifier; set the execution mode (`lock`,
    `never-lock`); decompose or merge; retire the loop.
 3. For each of these the loop's role is to **propose**, as a question addressed to its
    owner in its steer. It never performs the change on itself.
@@ -33,8 +33,8 @@ afterwards, or propose and wait. The answer required naming who decides.
 | Option | Why not |
 |---|---|
 | Loop acts on its own inference (infer-then-act) | Structural change to *what a loop is* made without its owner's judgement; groups could restructure from the bottom. |
-| Two modes: confirm for humans, act for agents | Two mechanisms for one concept; the owner notion already gives the latency difference for free. |
-| **Chosen: propose to owner; owner decides** | Authority flows down, evidence flows up; leaves propose, parents decide, the root's human decides for the root. |
+| Two modes: confirm for humans, act for agents | Two mechanisms for one concept. The owner definition already produces the difference in delay: an agent owner acts on its next run, a human owner acts when they choose. |
+| **Chosen: propose to owner; owner decides** | One mechanism. Leaf loops propose, parent loops decide for their children, and the human who runs the root decides for the root. |
 
 ## Consequences
 
@@ -45,5 +45,5 @@ afterwards, or propose and wait. The answer required naming who decides.
 
 ## Related
 
-- `0002-determinism-gradient-learned-and-declarable`
+- `0002-execution-mode-learned-and-owner-settable`
 - `0004-parents-develop-children-by-editing-spec`
