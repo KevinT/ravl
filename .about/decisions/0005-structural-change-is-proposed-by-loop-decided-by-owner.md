@@ -20,8 +20,8 @@ afterwards, or propose and wait. The answer required naming who decides.
    inferred from placement — a loop under a parent directory is owned by that parent
    loop; a root loop is owned by whoever runs it, human or agent. There is no owner
    field or registry.
-2. Only the owner may: change intent or verifier; set the execution mode (`lock`,
-   `never-lock`); decompose or merge; retire the loop.
+2. Only the owner may: change intent, verifier or code; set the execution mode (`lock`,
+   `never-lock`); set the read radius and budget; decompose or merge; retire the loop.
 3. For each of these the loop's role is to **propose**, as a question addressed to its
    owner in its steer. It never performs the change on itself.
 4. Latency of the decision follows the owner: a parent loop, being an agent, may decide

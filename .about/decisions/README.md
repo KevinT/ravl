@@ -29,3 +29,7 @@ force, nearest scope first.
 | [`0005-structural-change-is-proposed-by-loop-decided-by-owner`](0005-structural-change-is-proposed-by-loop-decided-by-owner.md) | Accepted | Lock, never-lock, split, merge, retire belong to the owner; the loop proposes |
 | [`0006-core-is-environment-blind`](0006-core-is-environment-blind.md) | Accepted | No knowledge store, organisation, host or runtime is named in the core; surfaces and resources are handed in |
 | [`0007-execution-learnings-are-generation-constraints`](0007-execution-learnings-are-generation-constraints.md) | Accepted | Execution knowledge is enforced on derivation, not offered as a hint |
+| [`0008-ravl-is-for-outcomes-that-recur`](0008-ravl-is-for-outcomes-that-recur.md) | Accepted | Scope is recurring outcomes; one-off tasks belong to interactive agents |
+| [`0009-no-run-starts-inside-ravl-no-upward-knowledge`](0009-no-run-starts-inside-ravl-no-upward-knowledge.md) | Accepted | Only external invocation starts a run; a loop never reads, signals or depends on an ancestor |
+| [`0010-loops-create-and-remove-children-within-budget`](0010-loops-create-and-remove-children-within-budget.md) | Accepted | A loop may create and remove loops in its own directory; per-run and per-subtree budgets cascade downward |
+| [`0011-read-radius-in-hops`](0011-read-radius-in-hops.md) | Accepted | Read scope is n hops within the containing directory, default 1; the loop narrows, the owner widens |

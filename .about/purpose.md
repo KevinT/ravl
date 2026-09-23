@@ -9,7 +9,8 @@ tags: [ravl, purpose, alignment-stack]
 `ravl` is a small, stand-alone library and protocol for **learning loops**: units of
 work that run once, check their own result against declared criteria, and leave
 addressed guidance for their next run. The name is the protocol — Reflect, Act,
-Verify, Learn.
+Verify, Learn. It is for outcomes that recur; each time an outcome is produced again,
+the loop that produces it should cost less and fail less than the time before.
 
 ## What this repository is a part of
 
@@ -23,7 +24,7 @@ Verify, Learn.
   working backwards from real purposes. It is built in public so others can contribute.
 - **Sideways — distribution surfaces.** A command-line tool, an agent skill, a
   tool-call interface: each is a *surface* through which the core is used, derived from
-  the core, never part of it. The core knows nothing about which surface invoked it.
+  the core, never part of it. The core receives no information about which surface invoked it.
 
 ## Trust boundaries
 

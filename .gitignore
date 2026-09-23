@@ -11,10 +11,13 @@ build/
 .env.*
 !.env.example
 
-# Loop run artefacts and learnings from actual use never enter the repo
-# (examples/ carries invented, public loops only)
+# Loop run artefacts and learnings from actual use never enter the repo.
+# Worked examples under examples/ are invented and public; their runs and
+# learnings are committed so the learning behaviour is visible in the repo.
 **/runs/
 **/learnings/
+!examples/**/runs/
+!examples/**/learnings/
 
 # OS / editor
 .DS_Store

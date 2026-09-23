@@ -29,11 +29,11 @@ Python environment existed in those repositories.
 
 The command line is the primary surface. A loop is developed by a repeated cycle:
 
-1. Edit `ravl_loop.md`.
+1. Edit `ravl.md`.
 2. Run the loop.
 3. Read what the run understood from the intent, whether Verify passed, what Learn
    wrote as steer, and any questions addressed to the owner.
-4. Edit `ravl_loop.md` again.
+4. Edit `ravl.md` again.
 
 The distribution must make step 2 and step 3 fast from any directory, with no project
 setup. It must also make the answer to "which version ran" unambiguous, because the
@@ -49,7 +49,7 @@ Three things are kept separate, each with one location:
 | Thing | Location | Versioned by |
 |---|---|---|
 | The library and `ravl` command | Installed once per host with `uv tool install ravl` | `uv tool upgrade ravl`; version reported by `ravl --version` |
-| Loops (`ravl_loop.md` and `config/`) | Any directory, usually a Git repository | The owner, in Git |
+| Loops (`ravl.md` and `config/`) | Any directory, usually a Git repository | The owner, in Git |
 | State (`runs/`, `learnings/`) | Beside each loop by default; relocatable by configuration | Not committed by default; the owner opts specific learnings in |
 
 ### One installation per host
@@ -57,7 +57,7 @@ Three things are kept separate, each with one location:
 `uv tool install ravl` is the only installation for running and developing loops. It
 places one `ravl` command on the path, in its own isolated environment managed by
 `uv`. A loops repository needs no `pyproject.toml`, no virtual environment and no
-dependency declaration; it is a directory tree of `ravl_loop.md` files.
+dependency declaration; it is a directory tree of `ravl.md` files.
 
 This is a deliberate narrowing from "host-wide or project dependency". Offering both
 recreates the condition that produced the recorded confusion.
@@ -82,12 +82,12 @@ same operations.
 | Command | Effect |
 |---|---|
 | `ravl run <dir>` | One run of the loop in `<dir>`. Prints, in order: the execution mode and whether it was set or learned; what Reflect understood from the intent; the Verify result; the steer Learn wrote; any questions for the owner; the cost ledger. |
-| `ravl list [<dir>]` | Every loop under `<dir>` (default: current directory), with its execution mode, last Verify result, and open questions. Found by scanning for `ravl_loop.md`; there is no registry. |
+| `ravl list [<dir>]` | Every loop under `<dir>` (default: current directory), with its execution mode, last Verify result, and open questions. Found by scanning for `ravl.md`; there is no registry. |
 | `ravl show <dir>` | The loop's current state without running it: mode, last run summary, steer, open questions, cost history. |
 | `ravl answer <dir>` | Interactive: presents each open question for the owner and records the answer where the next Reflect reads it. |
 | `ravl set <dir> lock \| never-lock \| learned` | Owner setting for execution mode. |
 | `ravl runs <dir>` | Lists runs; `ravl runs <dir> <id>` prints one trace. |
-| `ravl new <dir>` | Creates a directory with a template `ravl_loop.md` that has intent and verifier sections. |
+| `ravl new <dir>` | Creates a directory with a template `ravl.md` that has intent and verifier sections. |
 
 Output is written for a person reading a terminal. A `--json` flag emits the same
 content as structured data for the agent surface.

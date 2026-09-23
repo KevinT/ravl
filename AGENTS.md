@@ -9,9 +9,17 @@ You are working in `ravl`. Before changing anything, read in this order:
 3. [`.about/principles.md`](.about/principles.md) — what the library must never do.
 4. [`.about/decisions/README.md`](.about/decisions/README.md) — decisions in force.
    Walk up the tree from any file to collect every record that governs it.
+5. [`specifications/first-loop.md`](specifications/first-loop.md) — what is being built
+   now, in what order, and the kill criterion.
+6. [`specifications/reference/ravlgpt-guardrails.md`](specifications/reference/ravlgpt-guardrails.md)
+   — before building any component, check whether RavlGPT had one and apply the three
+   tests. Read RavlGPT for what it learned; never copy its code.
 
 ## Conventions
 
+- **Write in plain technical language.** Name the mechanism. No metaphor, no
+  personification of software, no rhetorical constructions. If a sentence has to be
+  decoded, rewrite it.
 - **`.about/` is the map; the code is the thing.** `purpose.md` answers "what is this
   a part of"; `README.md` answers "what are its parts". Do not duplicate one into the
   other; point.
@@ -25,5 +33,8 @@ You are working in `ravl`. Before changing anything, read in this order:
   anyone's actual use of `ravl`, in files or in history. Examples are public and
   invented.
 - **Say "LLM", not "AI".**
+- **Specification is driven by loops from here.** A run that contradicts the model
+  produces a decision record and a model edit, not a workaround in code. Open
+  questions go to `specifications/speculative/` first.
 - **Tests reach the core.** The phase contract, learning store, trust topology,
   verification harness and constraint enforcement are covered before any surface is.
