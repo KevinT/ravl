@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+
+# Loop run artefacts and learnings from actual use never enter the repo
+# (examples/ carries invented, public loops only)
+**/runs/
+**/learnings/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
