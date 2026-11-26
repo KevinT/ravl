@@ -203,8 +203,21 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
     trace.charge_llm(result)
     trace.save("act-response.md", result.text or "")
     report = llm.last_json(result.text) or {}
+    # The specification is the owner's. A change made to it during Act is undone
+    # here and kept in the run directory as a proposal for the owner to read.
+    spec_restored = False
+    spec_file = store.dir / "ravl.md"
+    try:
+        now = spec_file.read_text() if spec_file.is_file() else None
+    except OSError:
+        now = None
+    if now != spec.raw:
+        if now is not None:
+            trace.save("spec-proposed.md", now)
+        spec_file.write_text(spec.raw)
+        spec_restored = True
     return {
-        "driver": "llm", "ok": result.ok, "error": result.error,
+        "driver": "llm", "ok": result.ok, "error": result.error, "spec_restored": spec_restored,
         "reported": bool(report),
         "summary": str(report.get("summary", ""))[:1000],
         "procedure": [str(s) for s in report.get("procedure", [])][:60],
@@ -351,6 +364,11 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     if exhausted and not question:
         question = (f"{state['repair']['attempts']} repair attempts did not restore the outcome "
                     f"({failing_text}). {record['reason']} Last attempt: {evidence}")
+    if status == "fail" and act.get("spec_restored"):
+        note = (f" The repair attempt changed ravl.md; the change was undone and is kept in "
+                f"runs/{trace.data['run_id']}/spec-proposed.md.")
+        question = (str(question) + note) if question else (
+            f"Verifier fails ({failing_text}).{note} Apply it yourself if it is the right repair.")
     since = parse_iso(state["failing_since"]) if state.get("failing_since") else utcnow()
     overdue = utcnow() - since >= timedelta(hours=float(cfg["learn"]["escalate_hours"]))
     if status == "fail" and overdue and not question:

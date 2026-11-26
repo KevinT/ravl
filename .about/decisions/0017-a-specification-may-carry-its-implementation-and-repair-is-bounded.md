@@ -34,8 +34,12 @@ The model allows the specification to contain code (A1) and names `ravl.py` as t
    earlier classification and calls no LLM.
 4. **A repair attempt** is given the specification, the implementation's last output and
    the attempt number. It repairs the cause within what its owner permits, then runs
-   the implementation so that the run produces the outcome. It may not edit the Act
-   block; a change to it is proposed to the owner.
+   the implementation so that the run produces the outcome. It may not change the
+   specification. The runner enforces this: after an LLM-driven Act it compares
+   `ravl.md` with the text read at the start of the run, writes the original back if
+   they differ, keeps the changed text as `spec-proposed.md` in the run directory, and
+   names that file in the question to the owner. Verify always uses the criteria read
+   at the start of the run.
 5. **When a repair attempt passes Verify, the implementation is Act again** on the next
    run. No code is generated over an owner's implementation.
 6. **After `learn.max_repair_attempts` failed attempts on one failing condition
@@ -55,7 +59,8 @@ The model allows the specification to contain code (A1) and names `ravl.py` as t
 |---|---|
 | Keep the job as it is and add a separate loop that checks its outcome | Two things per outcome: the job, and its watcher. The purpose sits in one place and the implementation in another, and the watcher needs its own schedule. |
 | Convert the job to a bare intent and let an LLM re-derive the code | Discards an implementation that works, spends LLM calls to recover it, and puts generated code where the owner's code was. |
-| Let the repair attempt rewrite the Act block | The implementation is part of the specification, which only the owner changes (A8). |
+| Let the repair attempt rewrite the Act block | The implementation is part of the specification, which only the owner changes (A8). An attempt that could edit the file could also edit the checks that judge it. |
+| Forbid the edit in the prompt only | An instruction to an LLM is not a control. The comparison costs one file read. |
 | Unlimited repair attempts within the budget | The owner hears nothing until a budget runs out, and the same failed repair is paid for repeatedly. |
 | **Chosen: implementation in the specification; classify once; bounded repair; then the owner** | The job, its purpose and its test are one directory. A healthy run costs what the job cost before, plus the checks. |
 

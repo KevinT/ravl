@@ -170,3 +170,20 @@ def test_learn_does_not_call_the_llm_once_the_budget_is_spent(h):
     trace = h.run(loop)                                             # a new failure, budget already spent
     assert trace["cost"]["llm_calls"] == 0 and h.calls() == ["learn"]
     assert trace["learn"]["llm_error"] == "LLM budget for the window is spent"
+
+
+def test_a_repair_attempt_cannot_change_the_specification(h):
+    loop = _job(h)
+    original = (loop / "ravl.md").read_text()
+    (loop / "source").unlink()
+    edit = act(["sed -i 's/cmp -s source out/true/; s/cp source out/true/' ravl.md"], [])
+    h.behave({"learn": learn(**SOLUTION), "act": edit})
+    h.run(loop)                                    # the implementation fails; classified solution
+    attempt = h.run(loop)                          # the repair attempt rewrites the checks to pass
+    assert attempt["act"]["driver"] == "llm" and attempt["act"]["spec_restored"] is True
+    assert (loop / "ravl.md").read_text() == original
+    assert attempt["verify"]["status"] == "fail"   # judged by the criteria the owner wrote
+    proposed = loop / "runs" / attempt["run_id"] / "spec-proposed.md"
+    assert "true" in proposed.read_text() and "cmp -s source out" not in proposed.read_text()
+    text = h.store(loop).open_questions()[0]["text"]
+    assert "changed ravl.md; the change was undone" in text and "spec-proposed.md" in text
