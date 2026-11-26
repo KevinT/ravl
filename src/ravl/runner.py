@@ -17,6 +17,8 @@ from . import __version__, codegen, config, llm, prompts, spec as specmod, verif
 from .store import Store, Trace, iso, parse_iso, readable, utcnow, window_llm_calls, write_atomic
 
 
+TEMPFAIL = 75   # sysexits.h EX_TEMPFAIL: an implementation's declared world failure
+
 def run(loop_dir: Path, user_config: Path | None = None) -> dict:
     """Perform one run and return its trace."""
     loop_dir = Path(loop_dir).resolve()
@@ -279,7 +281,15 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     # already judged is the same event again; it is not sent to the LLM a second time.
     signature = f"{post['fingerprint']}|{driver}|{act.get('exit')}|{act.get('ok')}"
     judgement: dict = {}
-    if status == "fail" and driver == "code" and state.get("judged", {}).get("signature") == signature:
+    # Exit status 75 (EX_TEMPFAIL in sysexits.h) is the implementation's own statement
+    # that it could not proceed for a reason outside itself. It is taken as a world
+    # failure with no LLM call, so no repair attempt follows.
+    declared_world = status == "fail" and driver == "code" and act.get("exit") == TEMPFAIL
+    if declared_world:
+        judgement = {"classification": "world", "fault": None,
+                     "reason": f"the implementation exited {TEMPFAIL}: a temporary failure outside itself"}
+        record["judgement"] = "declared"
+    elif status == "fail" and driver == "code" and state.get("judged", {}).get("signature") == signature:
         judgement = {k: state["judged"].get(k) for k in ("classification", "fault", "reason", "hold")}
         record["judgement"] = "reused"
     elif driver in ("llm", "code") and status in ("pass", "fail") and (status == "fail" or driver == "llm"):
@@ -393,7 +403,7 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
                   "criterion in ravl.md.", trace.data["run_id"])
 
     # Learnings, kept apart: domain is context, execution is enforced.
-    if judgement and record.get("judgement") != "reused":
+    if judgement and record.get("judgement") not in ("reused", "declared"):
         stamp = {"run": trace.data["run_id"], "at": iso(utcnow())}
         record["domain_added"] = store.add_domain(
             [{"text": str(d.get("text", "")), "scope": d.get("scope", "local"), **stamp}

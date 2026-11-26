@@ -187,3 +187,16 @@ def test_a_repair_attempt_cannot_change_the_specification(h):
     assert "true" in proposed.read_text() and "cmp -s source out" not in proposed.read_text()
     text = h.store(loop).open_questions()[0]["text"]
     assert "changed ravl.md; the change was undone" in text and "spec-proposed.md" in text
+
+
+def test_exit_75_is_a_declared_world_failure_with_no_llm_call(h):
+    loop = h.loop("job", JOB.replace("cp source out", "test -e token || exit 75\ncp source out"))
+    (loop / "source").write_text("v1\n")
+    traces = [h.run(loop) for _ in range(3)]
+    assert all(t["act"]["exit"] == 75 and t["learn"]["classification"] == "world" for t in traces)
+    assert all(t["learn"]["judgement"] == "declared" for t in traces)
+    assert h.calls() == []                                        # never classified or repaired by an LLM
+    state = _state(h, loop)
+    assert state["mode"] == "code" and "hold" not in state and h.store(loop).open_questions() == []
+    (loop / "token").write_text("renewed\n")                     # the owner renews the credential
+    assert h.run(loop)["verify"]["status"] == "pass"

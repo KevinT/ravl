@@ -31,7 +31,10 @@ The model allows the specification to contain code (A1) and names `ravl.py` as t
    once.** A world failure changes nothing: the implementation keeps running on every
    run. A solution failure makes the next Act an LLM-driven repair attempt. A repeat of
    the same failure of code (same failing criteria, same exit status) reuses the
-   earlier classification and calls no LLM.
+   earlier classification and calls no LLM. An implementation that exits with status
+   75 (`EX_TEMPFAIL` in `sysexits.h`) has declared a world failure itself: it is
+   recorded as one with no LLM call, so an expired credential or an absent upstream
+   that the implementation can recognise never starts a repair attempt.
 4. **A repair attempt** is given the specification, the implementation's last output and
    the attempt number. It repairs the cause within what its owner permits, then runs
    the implementation so that the run produces the outcome. It may not change the
