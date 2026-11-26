@@ -45,6 +45,10 @@ first system eight questions were open and none was answered.
    `ravl ask --list` shows each open question and whether it was sent.
 7. **The answer comes back through `ravl answer`**, run by a person or by whatever
    receives the reply. The core does not know where a question went.
+8. **An answer makes an LLM-driven loop perform Act once, even when every check
+   passes.** The checks cannot see what the answer changes, so without this a loop whose
+   outcome holds would never read it. The Act prompt lists the answers given since the
+   last Act, and each is marked as read by the run that was shown it.
 
 ## Alternatives considered
 
@@ -61,6 +65,9 @@ first system eight questions were open and none was answered.
 
 - An answer changes nothing until the next run reads it. Whatever receives the reply
   may start a run after recording it; ravl does not.
+- A code-driven loop, and a loop whose specification carries its implementation, do not
+  act on an answer by itself: generated code and the owner's script take no answers. The
+  answer is read when such a loop next makes an LLM-driven attempt.
 - A parent that is itself a loop is shown its children's waiting questions at Reflect
   (`A7`). Whether it answers them, and which questions should go past it to a person,
   is not decided here and has not been observed.

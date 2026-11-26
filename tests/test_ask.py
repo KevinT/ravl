@@ -147,3 +147,26 @@ def test_with_no_ask_command_questions_wait_in_the_loop(h, capsys):
     capsys.readouterr()
     assert cli.main(["ask", str(loop), "--user-config", str(h.user_config)]) == 0
     assert "no open questions" in capsys.readouterr().out
+
+
+def test_an_answer_makes_an_llm_driven_loop_act_once_even_though_every_check_passes(h):
+    from conftest import MAINTAIN
+    loop = h.loop("maintain", MAINTAIN)
+    behaviour = act(["touch flag"], ["flag"])
+    behaviour["report"]["ask"] = "What colour should the flag be?"
+    h.behave({"act": behaviour, "learn": learn()})
+    assert h.run(loop)["act"]["driver"] == "llm"
+    quiet = h.run(loop)                           # the outcome holds and nothing is new
+    assert quiet["act"]["driver"] == "none" and quiet["cost"]["llm_calls"] == 0
+
+    h.store(loop).answer("q-001", "Red")
+    h.behave({"act": act(["echo red > flag"], ["flag"]), "learn": learn()})
+    acted = h.run(loop)
+    assert acted["reflect"]["world"]["status"] == "pass" and acted["act"]["driver"] == "llm"
+    assert acted["act"]["answers_read"] == ["q-001"] and acted["verify"]["status"] == "pass"
+    assert "# Answers given since the last Act (new: bring the work into line with them)\n" \
+           "- What colour should the flag be? -> Red" in h.prompt("act")
+    assert (loop / "flag").read_text().strip() == "red"
+
+    after = h.run(loop)                           # the answer has been read; the loop is quiet again
+    assert after["act"]["driver"] == "none" and after["cost"]["llm_calls"] == 0

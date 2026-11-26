@@ -238,7 +238,14 @@ def _hold_in_force(store, state, cfg, fingerprint) -> bool:
 
 def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
     world, mode = reflect["world"], reflect["mode"]
-    if world["status"] == "pass":
+    # An answer to a question the loop asked of its own accord is new information from
+    # its parent. In an LLM-driven loop it makes Act run once even when every check
+    # passes, because the checks cannot see what the answer changes.
+    unread = [q for q in store.questions()
+              if q.get("answer") and q["condition"].startswith(ASKED) and not q.get("used")]
+    answered = bool(unread) and mode["value"] == "llm" and not spec.act \
+        and bool(config.llm_command(cfg, "act"))
+    if world["status"] == "pass" and not answered:
         return {"driver": "none", "reason": "the outcome already holds"}
     held = world["status"] == "fail" and _hold_in_force(store, state, cfg, world["fingerprint"])
 
@@ -292,6 +299,7 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         "verifier_raw": spec.verifier_raw,
         "last_run": reflect["last_run"], "steer": reflect["steer"], "answers": reflect["answers"],
         "waiting": reflect["waiting"], "domain": reflect["domain"],
+        "new_answers": [f"{q['text']} -> {q['answer']}" for q in unread],
         "neighbours": [e for n in reflect["neighbours"] for e in n["entries"]],
         "constraints": [c["text"] for c in reflect["constraints"]],
         "resources": [f"{k}: {v}" for k, v in reflect["resources"].items()],
@@ -309,11 +317,15 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         spec_changed(store, spec, trace)   # undo any edit an unfinished attempt left in ravl.md
         return implementation_instead(f"the LLM did not complete the repair attempt ({result.error})")
     report = llm.last_json(result.text) or {}
+    if result.ok:
+        for question in unread:      # this Act was shown these answers; they are not new again
+            store.mark_question(question["id"], used=trace.data["run_id"])
     # The specification is the owner's. A change made to it during Act is undone
     # here and kept in the run directory as a proposal for the owner to read.
     spec_restored = spec_changed(store, spec, trace)
     return {
         "driver": "llm", "ok": result.ok, "error": result.error,
+        "answers_read": [q["id"] for q in unread] if result.ok else [],
         "spec_restored": bool(spec_restored), "restored": spec_restored,
         "reported": bool(report),
         "summary": str(report.get("summary", ""))[:1000],

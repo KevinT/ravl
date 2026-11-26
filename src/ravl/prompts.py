@@ -87,6 +87,9 @@ finish; a later phase records what was learned.
 # Owner's answers to earlier questions
 {_bullets(ctx['answers'])}
 
+# Answers given since the last Act (new: bring the work into line with them)
+{_bullets(ctx.get('new_answers', []))}
+
 # Questions already waiting for the owner (do not ask these again)
 {_bullets(ctx.get('waiting', []))}
 
