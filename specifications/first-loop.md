@@ -104,17 +104,24 @@ specified after the first loop has run to step 7.
 
 ### Status, 2026-11-26
 
-The class has been taken up before the first loop reached every step with a real LLM:
-0.1.0 runs a private tree of maintenance loops (data feeds that must stay current, a
-service that must stay connected), started hourly by an external scheduler. Each
-replaces or sits beside a hand-written check. That use is what required Reflect to run
-the verifier and Learn to hold
-([`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](../.about/decisions/0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md),
-[`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](../.about/decisions/0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md)).
-The loops are siblings in container directories; none has children yet, so parent
-loops, budget cascade and absorption of a removed child's learnings remain unbuilt and
-unexercised. What to observe, per the paragraph above: whether a loop repairs where the
-check it replaced only reported, and whether a repeated repair becomes code.
+The class was taken up on the day the runner was built, before the first loop had
+reached every step with a real LLM. A set of maintenance loops was put into scheduled
+use for about an hour and then withdrawn: it had been tested too little, and its owner
+had not yet been able to check it against the approach. Nothing built for it is in
+scheduled use. What it added to the library remains, as proposed decisions: Reflect
+running the verifier
+([`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](../.about/decisions/0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md)),
+the hold
+([`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](../.about/decisions/0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md)),
+and a specification that carries its implementation, with bounded repair
+([`0017-a-specification-may-carry-its-implementation-and-repair-is-bounded`](../.about/decisions/0017-a-specification-may-carry-its-implementation-and-repair-is-bounded.md)).
+
+The work continues one loop at a time: a loop written as a short intent with no
+criteria, run by hand beside whatever already does the job, writing to a test area, its
+output compared with the existing output. The first such run led to
+[`0018-a-loop-with-no-verifier-assumes-one-that-its-parent-edits`](../.about/decisions/0018-a-loop-with-no-verifier-assumes-one-that-its-parent-edits.md).
+No loop has a parent loop yet, so a parent editing a child, budget cascade and
+absorption of a removed child's learnings remain unbuilt and unexercised.
 
 ## How specification proceeds from here
 
