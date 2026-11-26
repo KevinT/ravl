@@ -8,8 +8,26 @@ version = "0.3.0"
 description = "Reflect, Act, Verify, Learn: loops for outcomes that recur. Each run checks its own result and leaves guidance for the next."
 readme = "README.md"
 license = "MPL-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = []
+authors = [{ name = "Kevin Trethewey" }]
+keywords = ["agents", "llm", "automation", "verification", "self-healing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+]
+
+[project.urls]
+Repository = "https://github.com/KevinT/ravl"
+Issues = "https://github.com/KevinT/ravl/issues"
 
 [project.scripts]
 ravl = "ravl.cli:main"
@@ -19,6 +37,12 @@ dev = ["pytest>=8"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ravl"]
+
+# A file uploaded to PyPI cannot be withdrawn and replaced, so the source
+# distribution holds only what is needed to build and test the package. The
+# design records, the worked example and its run traces stay in the repository.
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
