@@ -4,10 +4,10 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.2.3. The runner covers build steps 1 to 9 of
+> Pre-release, version 0.3.0. The runner covers build steps 1 to 9 of
 > [`specifications/first-loop.md`](specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
-> 0017 are implemented and still proposed. Read the model first.
+> 0018 are implemented and still proposed. Read the model first.
 
 ## Install and run
 

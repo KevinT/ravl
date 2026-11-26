@@ -2,6 +2,8 @@
 
 The specification is plain language. The library reads three things from it and
 nothing else: the title, the Intent section, and the Verifier section's criteria.
+When the specification gives no criteria, they are read from `verifier.md` beside it,
+which the first run derives from the intent and the loop's parent edits afterwards.
 A criterion may carry a fenced `check` block: a shell script whose exit status
 decides the criterion (0 passes). An optional Act section may carry a fenced `act`
 block: the owner's own implementation of Act, run on every run in place of an LLM.
@@ -18,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SPEC_FILE = "ravl.md"
+VERIFIER_FILE = "verifier.md"   # criteria assumed from the intent, kept beside the specification
 
 TEMPLATE = """\
 # {name}
@@ -59,6 +62,8 @@ class Spec:
     criteria: list[Criterion]
     raw: str
     act: str | None = None   # the owner's implementation, when the specification carries one
+    verifier_source: str = "none"     # "specification" | "file" | "none"
+    verifier_raw: str | None = None   # text of verifier.md when the criteria came from it
 
 
 def is_loop(directory: Path) -> bool:
@@ -130,6 +135,45 @@ def load(loop_dir: Path) -> Spec:
     title = next((m.group(1).strip() for m in [re.search(r"(?m)^#\s+(.+)$", raw)] if m),
                  Path(loop_dir).name)
     sections = _sections(raw)
+    criteria = _criteria(sections.get("verifier", ""))
+    source, verifier_raw = ("specification" if criteria else "none"), None
+    verifier_file = Path(loop_dir) / VERIFIER_FILE
+    if not criteria and verifier_file.is_file():
+        # The specification gives no criteria; the ones kept beside it are used as written.
+        verifier_raw = verifier_file.read_text()
+        criteria = _criteria(verifier_raw)
+        source = "file"
     return Spec(path=path, title=title, intent=sections.get("intent", ""),
-                criteria=_criteria(sections.get("verifier", "")), raw=raw,
-                act=_act(sections.get("act", "")))
+                criteria=criteria, raw=raw, act=_act(sections.get("act", "")),
+                verifier_source=source, verifier_raw=verifier_raw)
+
+
+def render_verifier(run_id: str, understood: str, assumptions: list[str], criteria: list[dict]) -> str:
+    """The text of verifier.md for criteria assumed from the intent.
+
+    Only the criteria are bullets, because bullets are what `_criteria` reads.
+    """
+    def one_line(text: str) -> str:
+        return re.sub(r"\s+", " ", str(text)).strip()
+
+    lines = [
+        "# Verifier (assumed)", "",
+        f"Derived from the intent in {SPEC_FILE} by run {run_id}. No person has reviewed it.",
+        "Every run uses this file as written. The loop does not change it; its parent does,",
+        "by editing the criteria below. A criterion with a `check` block is tested by running",
+        "that script from the loop directory: exit status 0 passes. A criterion without one",
+        "is recorded as unchecked. Delete this file to have it derived again.", "",
+    ]
+    if one_line(understood):
+        lines += ["## The outcome as understood", "", one_line(understood), ""]
+    if assumptions:
+        lines += ["## Assumed where the intent does not say", ""]
+        lines += [f"{number}. {one_line(text)}" for number, text in enumerate(assumptions, 1)]
+        lines += [""]
+    lines += ["## Criteria", ""]
+    for criterion in criteria:
+        lines.append(f"- {one_line(criterion['text'])}")
+        check = textwrap.dedent(str(criterion.get("check") or "")).strip()
+        if check:
+            lines += ["  ```check", *[f"  {line}" if line else "" for line in check.splitlines()], "  ```"]
+    return "\n".join(lines) + "\n"

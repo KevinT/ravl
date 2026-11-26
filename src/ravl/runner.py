@@ -36,6 +36,12 @@ def run(loop_dir: Path, user_config: Path | None = None) -> dict:
         env = {"RAVL_LOOP_DIR": str(loop_dir), "RAVL_RUN_ID": run_id,
                "RAVL_RUN_DIR": str(trace.dir), "RAVL_RUN_STARTED": str(int(trace.started))}
 
+        if not spec.criteria:
+            spec = _assume_verifier(spec, cfg, store, env, trace)
+        trace.data["verifier"] = {**trace.data.get("verifier", {}), "source": spec.verifier_source,
+                                  "criteria": len(spec.criteria),
+                                  "with_check": sum(1 for c in spec.criteria if c.check)}
+
         reflect = _reflect(spec, cfg, store, state, previous, env, trace)
         act = _act(spec, cfg, store, state, reflect, env, trace)
         post = _verify(spec, cfg, loop_dir, reflect, act, env, trace)
@@ -54,6 +60,45 @@ def _close_crashed(store: Store) -> dict | None:
         write_atomic(store.runs / previous["run_id"] / "trace.json",
                      json.dumps(previous, indent=2, sort_keys=True) + "\n")
     return previous
+
+
+# ------------------------------------------------------------------ VERIFIER
+
+def _assume_verifier(spec, cfg, store, env, trace):
+    """The specification gives no criteria: derive them from the intent, once.
+
+    They are written to verifier.md and used as written from then on. When they
+    cannot be derived, nothing is written and the run proceeds with no verifier.
+    """
+    def failed(reason: str):
+        trace.data["verifier"] = {"derived": False, "reason": reason}
+        return spec
+
+    command = config.llm_command(cfg, "derive")
+    if not command:
+        return failed("no LLM command is configured")
+    budget = cfg["budget"]
+    if window_llm_calls(store.dir, float(budget["window_hours"])) >= int(budget["llm_calls_per_window"]):
+        return failed("LLM budget for the window is spent")
+    prompt = prompts.derive({"loop_dir": str(store.dir), "spec_raw": spec.raw})
+    trace.save("derive-prompt.md", prompt)
+    result = llm.call(command, prompt, store.dir, {**env, "RAVL_PHASE": "derive"},
+                      int(cfg["llm"]["timeout_s"]))
+    trace.charge_llm(result)
+    trace.save("derive-response.md", result.text or "")
+    reply = llm.last_json(result.text) if result.ok else None
+    if not reply:
+        return failed(result.error or "reply was not a JSON object")
+    criteria = [{"text": str(c["text"]), "check": c.get("check") or None}
+                for c in reply.get("criteria") or []
+                if isinstance(c, dict) and str(c.get("text") or "").strip()]
+    if not criteria:
+        return failed("the reply held no criteria")
+    text = specmod.render_verifier(trace.data["run_id"], str(reply.get("understood") or ""),
+                                   [str(a) for a in reply.get("assumptions") or []], criteria)
+    write_atomic(store.dir / specmod.VERIFIER_FILE, text)
+    trace.data["verifier"] = {"derived": True, "file": specmod.VERIFIER_FILE}
+    return specmod.load(store.dir)
 
 
 # ------------------------------------------------------------------ REFLECT
@@ -201,6 +246,7 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
 
     prompt = prompts.act({
         "loop_dir": str(store.dir), "spec_raw": spec.raw, "precheck": world["checks"],
+        "verifier_raw": spec.verifier_raw,
         "last_run": reflect["last_run"], "steer": reflect["steer"], "answers": reflect["answers"],
         "domain": reflect["domain"],
         "neighbours": [e for n in reflect["neighbours"] for e in n["entries"]],
@@ -224,7 +270,8 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
     # here and kept in the run directory as a proposal for the owner to read.
     spec_restored = spec_changed(store, spec, trace)
     return {
-        "driver": "llm", "ok": result.ok, "error": result.error, "spec_restored": spec_restored,
+        "driver": "llm", "ok": result.ok, "error": result.error,
+        "spec_restored": bool(spec_restored), "restored": spec_restored,
         "reported": bool(report),
         "summary": str(report.get("summary", ""))[:1000],
         "procedure": [str(s) for s in report.get("procedure", [])][:60],
@@ -234,19 +281,29 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
     }
 
 
-def spec_changed(store, spec, trace) -> bool:
-    """Undo a change made to ravl.md during Act; keep the changed text in the run directory."""
-    spec_file = store.dir / "ravl.md"
-    try:
-        now = spec_file.read_text() if spec_file.is_file() else None
-    except OSError:
-        now = None
-    if now == spec.raw:
-        return False
-    if now is not None:
-        trace.save("spec-proposed.md", now)
-    spec_file.write_text(spec.raw)
-    return True
+def spec_changed(store, spec, trace) -> list[str]:
+    """Undo a change made during Act to the files a loop is specified and judged by.
+
+    ravl.md and verifier.md belong to the loop's parent. The changed text is kept in
+    the run directory as a proposal. Returns the names of the files written back.
+    """
+    restored = []
+    for name, original, kept_as in ((specmod.SPEC_FILE, spec.raw, "spec-proposed.md"),
+                                    (specmod.VERIFIER_FILE, spec.verifier_raw, "verifier-proposed.md")):
+        if original is None:
+            continue
+        path = store.dir / name
+        try:
+            now = path.read_text() if path.is_file() else None
+        except OSError:
+            now = None
+        if now == original:
+            continue
+        if now is not None:
+            trace.save(kept_as, now)
+        path.write_text(original)
+        restored.append(name)
+    return restored
 
 
 def _confirm(claims: list[str], loop_dir: Path, started: float) -> list[dict]:
@@ -399,8 +456,10 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
         question = (f"{state['repair']['attempts']} repair attempts did not restore the outcome "
                     f"({failing_text}). {record['reason']} Last attempt: {evidence}")
     if status == "fail" and act.get("spec_restored"):
-        note = (f" The repair attempt changed ravl.md; the change was undone and is kept in "
-                f"runs/{trace.data['run_id']}/spec-proposed.md.")
+        kept = {specmod.SPEC_FILE: "spec-proposed.md", specmod.VERIFIER_FILE: "verifier-proposed.md"}
+        files = act.get("restored") or [specmod.SPEC_FILE]
+        note = (f" The attempt changed {' and '.join(files)}; the change was undone and is kept in "
+                + " and ".join(f"runs/{trace.data['run_id']}/{kept[name]}" for name in files) + ".")
         question = (str(question) + note) if question else (
             f"Verifier fails ({failing_text}).{note} Apply it yourself if it is the right repair.")
     since = parse_iso(state["failing_since"]) if state.get("failing_since") else utcnow()
@@ -422,9 +481,11 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
         asked = store.ask(condition, str(question), trace.data["run_id"])
         record["question"] = asked["id"] if asked else None
     if status == "no-verifier":
-        store.ask("no-verifier", "No criterion in the Verifier section has a check, so this loop "
-                  "cannot tell whether its outcome holds. Add a `check` block to at least one "
-                  "criterion in ravl.md.", trace.data["run_id"])
+        why = trace.data.get("verifier", {}).get("reason")
+        store.ask("no-verifier", "No criterion has a check, so this loop cannot tell whether its "
+                  "outcome holds. " + (f"Criteria could not be derived from the intent ({why}). " if why else "")
+                  + "Add a `check` block to at least one criterion, in verifier.md or in the "
+                  "Verifier section of ravl.md.", trace.data["run_id"])
 
     # Learnings, kept apart: domain is context, execution is enforced.
     if judgement and record.get("judgement") not in ("reused", "declared"):

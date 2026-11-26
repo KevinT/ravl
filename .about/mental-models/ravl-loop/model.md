@@ -51,8 +51,15 @@ the owner what it understood from the specification.
 The verifier is a list of criteria in plain language. A criterion may carry a **check**:
 a script whose exit status decides it. Verify runs the checks and nothing else, with no
 LLM, so the state of an outcome can be read when no LLM is reachable. A criterion with
-no check is recorded as unchecked; a loop with no checks has no verifier yet
+no check is recorded as unchecked
 ([`0014-verifier-criteria-carry-checks`](../../decisions/0014-verifier-criteria-carry-checks.md), proposed).
+
+The owner need not write the verifier. When the specification gives no criteria, the
+first run derives them from the intent, before Act, and writes them to `verifier.md`
+beside `ravl.md`, with what it understood and what it assumed. Later runs use that file
+as written. The loop's parent improves it by editing it; the loop it judges cannot
+change it, and may only propose
+([`0018-a-loop-with-no-verifier-assumes-one-that-its-parent-edits`](../../decisions/0018-a-loop-with-no-verifier-assumes-one-that-its-parent-edits.md), proposed).
 
 The specification may carry the implementation. An Act section with an `act` block is
 the owner's own code for Act: it runs on every run with no LLM, a solution failure
@@ -232,9 +239,11 @@ loop to know is written into the loop's specification, config or budget.
 
 ### A8 — Every loop has exactly one owner; the owner grows and prunes the tree
 
-The owner is whoever holds the loop's intent and verifier. Ownership is determined by
-placement: a loop inside another loop's directory is owned by that loop; a root loop is
-owned by whoever runs it, human or agent. There is no owner field and no registry.
+The owner is whoever holds the loop's intent and verifier, and is the loop's parent.
+Ownership is determined by placement: a loop inside another loop's directory is owned by
+that loop; a loop with no loop above it is owned by the person whose tree it is. Every
+loop therefore has a parent, and the person is the parent of every loop at the top of
+the directory tree. There is no owner field and no registry.
 
 **Only the owner may:** change the intent, verifier or code; set `lock` or
 `never-lock`; set the read radius; set the budget; split, merge or retire the loop. For

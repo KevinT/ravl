@@ -1,4 +1,4 @@
-"""The three prompts the library sends: Act, Learn, and code generation.
+"""The prompts the library sends: Act, Learn, code generation, and deriving a verifier.
 
 Each states a contract and the form of the reply. The wording follows the model's
 decision framework; the numbered questions are those of the mental model.
@@ -45,6 +45,18 @@ you found is worth more than a guess.
 """
 
 
+def _verifier_file(ctx: dict) -> str:
+    if not ctx.get("verifier_raw"):
+        return ""
+    return f"""
+# Verifier (verifier.md: the criteria this run is judged by, with their check scripts)
+The specification gives no criteria, so these were assumed from the intent on an earlier
+run or at the start of this one. They are used as written.
+
+{ctx['verifier_raw'].strip()}
+"""
+
+
 def act(ctx: dict) -> str:
     child_rule = (
         "You may create, edit and remove child loops: subdirectories of the loop directory "
@@ -61,7 +73,7 @@ finish; a later phase records what was learned.
 
 # Specification (ravl.md, written by the owner)
 {ctx['spec_raw'].strip()}
-
+{_verifier_file(ctx)}
 # State of the world at Reflect (verifier checks run before you started)
 {_checks(ctx['precheck'])}
 
@@ -89,7 +101,9 @@ finish; a later phase records what was learned.
 {_owner_act(ctx)}# Rules
 - Do what is needed for every verifier criterion to pass, and no more.
 - You may write inside the loop directory and to whatever the intent names. Do not edit
-  this loop's ravl.md or config/, and do not write under learnings/ or runs/.
+  this loop's ravl.md, verifier.md or config/, and do not write under learnings/ or runs/.
+  If a criterion is wrong or cannot be met as written, leave it as it is and say which
+  one and why in your summary; the loop's parent decides whether to change it.
 - {child_rule}
 - Do not start a run of this or any other loop.
 - If the outcome cannot be produced without a decision, a credential or an action that
@@ -212,4 +226,48 @@ If the procedure is not the same from run to run, or it needs judgement that cod
 supply, reply with only this JSON object: {{"repeatable": false, "reason": "<one sentence>"}}
 
 Otherwise reply with the program in one fenced python block and nothing else.
+"""
+
+
+DERIVE_REPLY = """{"understood": "<one or two sentences: the outcome the owner wants, as you understand it>",
+ "assumptions": ["<each thing you had to assume because the intent does not say>"],
+ "criteria": [{"text": "<one sentence>", "check": "<bash script, or null>"}]}"""
+
+
+def derive(ctx: dict) -> str:
+    return f"""You are writing the verifier of a RAVL loop. The owner wrote the specification below as
+a short statement of intent and gave no verification criteria. Write the criteria that
+decide whether a run of this loop achieved the intent. You have no tools: work from the
+text alone.
+
+# Loop directory (checks are run from here, with bash)
+{ctx['loop_dir']}
+
+# Specification (ravl.md, written by the owner)
+{ctx['spec_raw'].strip()}
+
+# Rules
+- A criterion is one sentence in plain language that is true of the result when the
+  intent has been met. State the result, not the steps that produce it.
+- Cover what the owner asks for and what the owner rules out. Do not add a requirement
+  the intent neither states nor clearly implies. Where the intent leaves something open
+  and you had to choose (a file name, a location, a period, a format detail), list the
+  choice under "assumptions" so the owner can correct it.
+- Write the few criteria that matter, normally three to seven.
+- Give a criterion a "check" wherever it can be tested mechanically: a bash script, run
+  from the loop directory, whose exit status 0 means the criterion holds. A check tests
+  the result itself. It changes nothing, finishes in seconds, uses the network only when
+  the criterion cannot be tested otherwise, and prints what is wrong when it fails,
+  because that output is what the next attempt is shown.
+- The runtime sets RAVL_RUN_DIR for every check, and the file "$RAVL_RUN_DIR/started" is
+  written when a run starts: `test FILE -nt "$RAVL_RUN_DIR/started"` is true when FILE
+  was written during the run.
+- Where no mechanical test is possible, set "check" to null. The criterion is then
+  recorded as unchecked.
+- These criteria are used unchanged on every later run until the owner edits them. Do
+  not write one that holds only today, or only for the data present now.
+
+Reply with one JSON object of this form and nothing else:
+
+{DERIVE_REPLY}
 """

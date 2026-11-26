@@ -19,6 +19,15 @@ def _mode_label(cfg_mode: str, state: dict) -> str:
     return ("code-driven" if state["mode"] == "code" else "LLM-driven") + " (learned)"
 
 
+def _verifier(loop_dir: Path) -> dict:
+    try:
+        spec = specmod.load(loop_dir)
+    except specmod.SpecError:
+        return {"source": "none", "criteria": 0, "with_check": 0}
+    return {"source": spec.verifier_source, "criteria": len(spec.criteria),
+            "with_check": sum(1 for c in spec.criteria if c.check)}
+
+
 def summary(loop_dir: Path) -> dict:
     """The state of a loop without running it."""
     store = Store(loop_dir)
@@ -48,6 +57,7 @@ def summary(loop_dir: Path) -> dict:
         "failing": [c["text"] for c in last.get("verify", {}).get("checks", [])
                     if c["status"] == "fail"] if last else [],
         "hold": state.get("hold"),
+        "verifier": _verifier(loop_dir),
         "questions": store.open_questions(),
         "steer": store.steer_text("reflect.md"),
     }
@@ -147,6 +157,10 @@ def cmd_show(args) -> int:
         return 0
     print(f"{row['title']}  ({row['loop']})")
     print(f"mode       {row['mode']}")
+    where = {"specification": "written in ravl.md", "file": f"in {specmod.VERIFIER_FILE}",
+             "none": "none yet"}[row["verifier"]["source"]]
+    print(f"verifier   {where}: {row['verifier']['criteria']} criteria, "
+          f"{row['verifier']['with_check']} with a check")
     print(f"runs       {row['runs_kept']} kept; consecutive passes {row['consecutive_passes']}")
     print(f"last run   {row['last_run']} · act {row['last_act']} · verify {row['last_verify']}")
     for text in row["failing"]:
