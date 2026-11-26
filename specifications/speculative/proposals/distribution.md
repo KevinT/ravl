@@ -1,6 +1,6 @@
 # Proposal: distribution of `ravl`
 
-Status: speculative. Not a decision. If accepted, this becomes decision record 0008.
+Status: carried into [`0012-one-install-per-host-and-the-command-line-first`](../../../.about/decisions/0012-one-install-per-host-and-the-command-line-first.md) (proposed, implemented in 0.1.0). This file is kept as the reasoning behind that record.
 
 ## Problem
 

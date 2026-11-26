@@ -67,9 +67,31 @@ one commit and one decision record if it settles anything the model left open.
 Steps 1–5 are the minimum for the red–green cycle on a spec. Step 6 is the kill
 criterion. Steps 7–9 make the result usable.
 
+### Status, 2026-11-26
+
+Steps 1 to 9 are built (version 0.1.0) and covered by tests that use a scripted command
+in place of the LLM. The loop is at [`../examples/decision-report`](../examples/decision-report).
+
+| Step | Result with a real LLM |
+|---|---|
+| 2 to 5 | Run 1: LLM-driven Act wrote `report.md`; the effect was confirmed; all four checks passed; Learn wrote steer; run 2's trace shows it read that steer. |
+| 6 (kill criterion) | Runs 1 to 3 were LLM-driven (2 to 3 LLM calls, 19 to 35 s each). After run 3 Learn generated `learnings/generated/act.py`, which was accepted. Runs 4 and 5 were code-driven: 0 LLM calls, 0.09 s, Verify passed. The criterion is met on this loop. |
+| 7 | Covered by tests. With a real LLM it was exercised on a copy of the loop moved to another directory with line 2 of the report redefined by the owner, not by renaming a file (the generated code reads decision files by pattern, so a rename does not break it). The generated code failed Verify; Learn classified a solution failure and moved the loop to LLM-driven (1 LLM call); the next run was LLM-driven and passed. Regeneration of code after that was not run to completion with a real LLM. |
+
+Settled while building, recorded as proposed decisions 0012 to 0016: distribution, the
+LLM as a command, checks in the verifier, Reflect running the verifier, and the hold.
+
+Differences from the table above: the trace does not yet record network calls (the
+field is present and empty), and question 10 uses the count of consecutive LLM-driven
+passes and the LLM's own judgement of whether the procedure repeats; it does not yet
+measure variance of effects or inputs.
+
 Not built for the first loop: children, budgets beyond a per-run token cap, read radius,
 `ravl.py` loops, the MCP surface, configuration beyond `config/mode`. Each of those is
-introduced by the first loop that needs it.
+introduced by the first loop that needs it. (As of 0.1.0 the read radius, the rolling
+LLM-call budget over a subtree, and `config/loop.toml` are built, because the second
+loop's class needs them. Still not built: `ravl.py` loops, budget cascade from parent
+to child, absorption of a removed child's learnings, the MCP surface.)
 
 ## The second loop
 

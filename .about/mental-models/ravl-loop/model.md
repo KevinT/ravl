@@ -24,8 +24,8 @@ REFLECT ──► ACT ──► VERIFY ──► LEARN
 
 | Phase | Does | Does not |
 |---|---|---|
-| **Reflect** | Reads the current state of the world, the resource inventory for this run, and every steer entry the loop is permitted to read. Produces the context for Act. | Decide or act. |
-| **Act** | Performs the work described by the intent, either by an LLM acting directly, by code, or by a combination. Produces the **effect**. May create, edit or remove child loops. | Re-read the world, verify, or learn. |
+| **Reflect** | Reads the current state of the world by running the verifier's checks, and reads the resource inventory for this run and every steer entry the loop is permitted to read. Produces the context for Act. | Decide or act. |
+| **Act** | Performs the work described by the intent, either by an LLM acting directly, by code, or by a combination. Produces the **effect**. Does nothing when the outcome already holds at Reflect, or when the last Learn set a hold that is still in force. May create, edit or remove child loops. | Re-read the world, verify, or learn. |
 | **Verify** | Compares the effect against the owner's criteria. Judges domain quality only. Whether the machinery worked is already recorded in the trace. | Take new actions or update anything. |
 | **Learn** | Classifies what happened, decides whether the loop's execution mode changes, and writes **steer**. | Act, re-analyse the world, or write outside its own loop directory. |
 
@@ -47,6 +47,12 @@ reads the result, sharpens the intent or adds a verification criterion, and runs
 until the loop passes consistently. This is the red–green–refactor cycle applied to a
 plain-language specification. The library's job is to make each cycle fast and to show
 the owner what it understood from the specification.
+
+The verifier is a list of criteria in plain language. A criterion may carry a **check**:
+a script whose exit status decides it. Verify runs the checks and nothing else, with no
+LLM, so the state of an outcome can be read when no LLM is reachable. A criterion with
+no check is recorded as unchecked; a loop with no checks has no verifier yet
+([`0014-verifier-criteria-carry-checks`](../../decisions/0014-verifier-criteria-carry-checks.md), proposed).
 
 A specification is one of two files in the loop's directory:
 
@@ -108,6 +114,19 @@ loop's design, and it can be learned like anything else the loop does.
 
 A loop is a tool that a long-running agent can call; it is not itself a long-running
 process.
+
+Two consequences for a loop that is run on a schedule to maintain an outcome
+([`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](../../decisions/0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md),
+[`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](../../decisions/0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md), both proposed):
+
+- **A run in which the outcome already holds costs the checks only.** Reflect runs the
+  verifier; when it passes, Act does nothing and no LLM is called. A loop that must
+  produce something new on every run says so in its verifier.
+- **A failure that only the owner can remove is attempted once, not on every run.**
+  Learn may set a **hold** keyed on the set of failing criteria. While the hold is in
+  force, runs record the failure and call no LLM. The hold ends when the failing set
+  changes, the owner answers, the outcome holds again, or the hold expires. The question
+  for the owner is written once per failing condition.
 
 ### A4 — Domain knowledge and execution knowledge are stored and used separately
 
@@ -255,6 +274,8 @@ The questions a loop evaluates, in order.
 
 ### On every run, Reflect evaluates
 
+0. **Does the outcome already hold?** Run the verifier's checks against the world. This
+   is the state of the world that Act receives.
 1. **What is the execution mode, and was it set by the owner or learned?** An owner
    setting wins.
 2. **What is my budget for this run, and what has this subtree spent in the current
@@ -267,13 +288,18 @@ The questions a loop evaluates, in order.
 5. **Did the last run complete?** A stall or crash recorded in the trace is the first
    input to this run.
 
+Act then does nothing if question 0 was answered yes, or if a hold from the last Learn
+is still in force for the same failing criteria. Otherwise it performs the work once.
+
 ### After Verify, Learn evaluates, in order, without skipping
 
 6. **Did the run complete, and was the effect produced?** Read from the trace.
 7. **Did Verify pass?** If no verifier is defined yet, record that. A loop without a
    verifier is in the red phase of development (A1), not in a failed state.
 8. **If Verify failed: world or solution?** World (including budget exhausted): record
-   it, make no mode change. Solution: continue.
+   it, make no mode change. Solution: continue. In either case decide whether another
+   attempt can succeed before the owner acts or the world changes; if not, set a hold
+   and write one question for the owner.
 9. **If solution: is the fault in the specification or in the derivation?** Ambiguous
    intent: write a question to the owner; make no mode change. Wrong derivation: move
    toward LLM-driven so the next Act re-derives.
@@ -314,12 +340,17 @@ The questions a loop evaluates, in order.
 ```
 my_loop/
   ravl.md  or  ravl.py  intent and verifier (and code, in .py); the file the owner edits
-  config/               owner settings: execution mode, read radius, budgets, overrides
+  config/               owner settings
+    mode                lock | never-lock | learned
+    loop.toml           read radius, budgets, timeouts, resources, overrides
   learnings/
+    state.json          learned execution mode, pass counts, hold
     domain/             facts about the task (A4)
     execution/          constraints on generated code (A4)
-    steer/              addressed guidance from the last Learn (A6)
-  runs/                 one directory per run: trace, cost ledger, list of effects produced
+    steer/              addressed guidance from the last Learn (A6): reflect.md,
+                        owner.md, siblings.md, and questions.json with the owner's answers
+    generated/act.py    code that performs Act once the loop is code-driven (A2)
+  runs/                 one directory per run: trace, cost ledger, prompts and responses
   child_a/              a child loop, owned by my_loop (A8), which reads its siblings (A7)
 ```
 

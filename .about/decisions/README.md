@@ -33,3 +33,8 @@ force, nearest scope first.
 | [`0009-no-run-starts-inside-ravl-no-upward-knowledge`](0009-no-run-starts-inside-ravl-no-upward-knowledge.md) | Accepted | Only external invocation starts a run; a loop never reads, signals or depends on an ancestor |
 | [`0010-loops-create-and-remove-children-within-budget`](0010-loops-create-and-remove-children-within-budget.md) | Accepted | A loop may create and remove loops in its own directory; per-run and per-subtree budgets cascade downward |
 | [`0011-read-radius-in-hops`](0011-read-radius-in-hops.md) | Accepted | Read scope is n hops within the containing directory, default 1; the loop narrows, the owner widens |
+| [`0012-one-install-per-host-and-the-command-line-first`](0012-one-install-per-host-and-the-command-line-first.md) | Proposed | One `uv tool` install per host; the command set; three-level configuration; PEP 723 for generated code |
+| [`0013-the-llm-is-a-command-the-owner-configures`](0013-the-llm-is-a-command-the-owner-configures.md) | Proposed | The LLM is an argv list: prompt on stdin, response on stdout; the Act command is an agent |
+| [`0014-verifier-criteria-carry-checks`](0014-verifier-criteria-carry-checks.md) | Proposed | A criterion may carry a check script; Verify runs checks only, with no LLM |
+| [`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md) | Proposed | A run in which the outcome already holds costs the checks only |
+| [`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md) | Proposed | A failure only the owner can remove is attempted once and asked about once |

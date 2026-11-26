@@ -75,6 +75,11 @@ Sizes are lines of Python at the last commit, for scale.
 Add rows here when a component is encountered that is not listed above. Classify it
 before building its replacement.
 
+Note on 0.1.0: the runner was written from the model, the decision records and the tables
+above. RavlGPT's seven prompt templates were not read before the three phase prompts in
+`src/ravl/prompts.py` were written, so the "adapt" step for prompts is still to do: read
+each template and carry over any wording that was corrected after a failure.
+
 ## What RavlGPT's own evidence says to look at first
 
 The self-diagnosis at
