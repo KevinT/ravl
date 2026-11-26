@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ravl"
+version = "0.1.0"
+description = "Reflect, Act, Verify, Learn: loops for outcomes that recur. Each run checks its own result and leaves guidance for the next."
+readme = "README.md"
+license = "MPL-2.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+ravl = "ravl.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ravl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
