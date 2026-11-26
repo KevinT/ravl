@@ -4,31 +4,57 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.3.0. The runner covers build steps 1 to 9 of
+> Pre-release, version 0.4.0. The runner covers build steps 1 to 9 of
 > [`specifications/first-loop.md`](specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
-> 0018 are implemented and still proposed. Read the model first.
+> 0019 are implemented and still proposed. Read the model first.
 
 ## Install and run
 
 ```sh
 uv tool install git+https://github.com/KevinT/ravl     # one installation per host
+uv tool upgrade ravl                                   # later, to update it
+ravl config                                            # shows the agent programs it found; choose one
 ravl new my-loop                                       # writes my-loop/ravl.md
 $EDITOR my-loop/ravl.md                                # intent, and criteria with checks
 ravl run my-loop                                       # one run: Reflect, Act, Verify, Learn
 ravl list                                              # every loop below here, with its state
 ```
 
-`ravl run` needs an LLM for Act and Learn. The LLM is a command you configure once in
-`~/.config/ravl/config.toml`; it reads a prompt on standard input and writes its reply
-on standard output. For Act it must be an agent that can change files and run commands.
-[`contrib/backends/claude-code`](contrib/backends/claude-code) is an adapter for one such
-agent; the core does not depend on it.
+`ravl run` needs an LLM for Act and Learn, and for Act it must be an agent: a program that
+can change files and run commands. ravl has no agent of its own. It ships backends for
+agent programs you may already have, each of which uses its own sign-in:
+
+| Backend | Program | State |
+|---|---|---|
+| `claude` | Claude Code | run end to end |
+| `codex` | Codex CLI | written from the program's help text; not yet run against a signed-in Codex |
+
+`ravl config` shows which of them are on `PATH` and whether a sign-in was found. It starts
+no program and reads no credential. `ravl config set claude --model sonnet` writes the
+choice to `~/.config/ravl/config.toml`. ravl never chooses one by itself.
+
+```toml
+[llm]
+backend = "claude"
+model = "sonnet"
+
+[llm.learn]            # optional: another model for one phase
+model = "haiku"
+```
+
+For any other agent, name a command in place of a backend. It reads a prompt on standard
+input and writes its reply on standard output; `RAVL_PHASE` tells it which phase it is in.
+[`contrib/backends/claude-code`](contrib/backends/claude-code) is an example.
 
 ```toml
 [llm]
 command = ["/path/to/an/agent-adapter"]
 ```
+
+In Act the agent runs with its approval prompts off, because nobody is present to answer
+them. **ravl does not confine a run yet.** Until it does, run loops you have not read
+inside a sandbox of your own.
 
 A specification is one file. A criterion with a `check` block is decided by the block's
 exit status; no LLM takes part in Verify.
@@ -114,7 +140,8 @@ Tests: `uv run pytest`.
 src/ravl/          the library and the `ravl` command
 tests/             phase contract, learning store, read rule, verification, constraints
 examples/          public, invented loops with their runs and learnings
-contrib/backends/  adapters between the LLM contract and particular agents; not core
+src/ravl/backends/ adapters for agent programs, run as a separate process; not core
+contrib/backends/  an example of a custom command adapter
 specifications/    what is being built next
   first-loop.md    the first loop and the build order for the runner
   reference/       guardrails for consulting RavlGPT

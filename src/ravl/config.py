@@ -1,6 +1,7 @@
 """Configuration, resolved from three files, later overriding earlier.
 
-1. User file (`~/.config/ravl/config.toml`): the LLM command, set once per host.
+1. User file (`~/.config/ravl/config.toml`): the LLM backend or command, set once per
+   host, by hand or with `ravl config`.
 2. `ravl.toml` at the root of a tree of loops: settings for the whole tree.
 3. `config/` in the loop directory: the owner's settings for that loop.
 
@@ -11,6 +12,8 @@ command the owner supplies, and resources are entries the owner lists.
 from __future__ import annotations
 
 import copy
+import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -21,9 +24,11 @@ TREE_FILE = "ravl.toml"
 MODES = ("lock", "never-lock", "learned")
 
 DEFAULTS: dict = {
-    # argv of a command that reads a prompt on stdin and writes the response on
-    # stdout. `llm.act`, `llm.learn` and `llm.codegen` may each override it.
-    "llm": {"command": None, "timeout_s": 900},
+    # `command` is the argv of a program that reads a prompt on stdin and writes the
+    # response on stdout. `backend` names an adapter shipped with ravl, which is run the
+    # same way; `model` is passed to it. A command takes precedence over a backend.
+    # `llm.act`, `llm.learn`, `llm.codegen` and `llm.derive` may each override these.
+    "llm": {"command": None, "backend": None, "model": None, "timeout_s": 900},
     "run": {"check_timeout_s": 120, "code_timeout_s": 600, "keep_runs": 200},
     "learn": {
         "promote_after": 3,      # consecutive LLM-driven passes before code is generated
@@ -113,4 +118,47 @@ def llm_command(cfg: dict, phase: str) -> list[str] | None:
     llm = cfg.get("llm", {})
     specific = llm.get(phase, {}) if isinstance(llm.get(phase), dict) else {}
     command = specific.get("command") or llm.get("command")
-    return list(command) if command else None
+    if command:
+        return list(command)
+    backend = specific.get("backend") or llm.get("backend")
+    if not backend:
+        return None
+    # The name is handed on unread: which agent programs exist is known to the
+    # adapter process, not here.
+    model = specific.get("model") or llm.get("model")
+    return [sys.executable, "-m", "ravl.backends", str(backend)] + (["--model", str(model)] if model else [])
+
+
+def _toml(data: dict, prefix: str = "") -> list[str]:
+    """Enough TOML to write the settings this library reads: scalars, lists, tables."""
+    lines, tables = [], []
+    for key, value in data.items():
+        if isinstance(value, dict):
+            tables.append((key, value))
+        elif value is not None:
+            rendered = ("true" if value else "false") if isinstance(value, bool) else json.dumps(value)
+            lines.append(f"{key} = {rendered}")
+    for key, value in tables:
+        name = f"{prefix}{key}"
+        lines += ["", f"[{name}]", *_toml(value, name + ".")]
+    return lines
+
+
+def choose_backend(name: str, model: str | None, path: Path | None = None) -> Path:
+    """Record the owner's choice of backend in the user file. Other settings are kept.
+
+    A `command` at the top of `[llm]` is removed, because it would take precedence.
+    Comments in the file are not kept: it is rewritten from its values.
+    """
+    path = path or USER_CONFIG
+    data = _read(path) if path.is_file() else {}
+    llm = data.setdefault("llm", {})
+    llm.pop("command", None)
+    llm["backend"] = name
+    if model:
+        llm["model"] = model
+    else:
+        llm.pop("model", None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(_toml(data)).strip() + "\n")
+    return path

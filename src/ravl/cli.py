@@ -76,6 +76,8 @@ def _print_run(trace: dict, loop_dir: Path) -> None:
     print(f"reflect  {sum(c['status'] == 'pass' for c in checks)} of {len(checks)} criteria hold before Act")
     detail = act.get("summary") or act.get("reason") or act.get("error") or ""
     print(f"act      {act.get('driver', 'not reached')}" + (f": {detail}" if detail else ""))
+    if "no LLM command is configured" in (detail, trace.get("verifier", {}).get("reason")):
+        print("           to configure one: ravl config")
     for effect in act.get("effects", []):
         mark = {True: "confirmed", False: "NOT PRODUCED", None: "unconfirmable"}[effect["confirmed"]]
         print(f"           effect {effect['claim']} [{mark}]")
@@ -199,6 +201,79 @@ def cmd_set(args) -> int:
     return 0
 
 
+NO_CONFINEMENT = ("In Act the agent runs with its approval prompts off, because nobody is present to "
+                  "answer them.\nravl does not confine a run yet.")
+
+
+def _config_show(path: Path) -> tuple[dict, list[dict]]:
+    from . import backends   # the registry is read here and by the adapter process, not by a run
+    llm = config._read(path).get("llm", {}) if path.is_file() else {}
+    found = backends.look_all()
+    print(f"settings file   {path}" + ("" if path.is_file() else "  (not written yet)"))
+    if llm.get("command"):
+        print(f"LLM             command: {' '.join(map(str, llm['command']))}")
+    elif llm.get("backend"):
+        print(f"LLM             backend: {llm['backend']}"
+              + (f", model {llm['model']}" if llm.get("model") else ", the program's default model"))
+    else:
+        print("LLM             not configured: a run performs no Act and derives no verifier")
+    for phase in ("act", "learn", "codegen", "derive"):
+        over = llm.get(phase)
+        if isinstance(over, dict) and over:
+            print(f"  {phase:<13} " + ", ".join(f"{k} {v}" for k, v in over.items()))
+    print("\nAgent programs ravl has a backend for:")
+    for number, row in enumerate(found, 1):
+        program = f"on PATH ({row['program']})" if row["program"] else "not on PATH"
+        signin = (f"sign-in found ({', '.join(row['signin'])})" if row["signin"]
+                  else f"no sign-in found (to sign in: {row['signin_hint']})")
+        print(f"  {number}. {row['name']:<7} {row['title']:<12} {program}; {signin}")
+        print(f"     during Act: {row['confines_act']}")
+        if row["note"]:
+            print(f"     note: {row['note']}")
+    print("\n" + NO_CONFINEMENT)
+    print("Choose with:    ravl config set <name> [--model MODEL]")
+    print("Any other agent: set `command` under [llm] in the settings file to a program that reads a\n"
+          "                prompt on standard input and writes the reply on standard output.")
+    return llm, found
+
+
+def cmd_config(args) -> int:
+    from . import backends
+    path = Path(args.user_config) if args.user_config else config.USER_CONFIG
+    if args.action == "set":
+        if not args.name:
+            print("give the backend name: ravl config set <name> [--model MODEL]", file=sys.stderr)
+            return 2
+        backend = backends.BACKENDS.get(args.name)
+        if backend is None:
+            print(f"no backend named {args.name!r}; known: {', '.join(backends.BACKENDS)}", file=sys.stderr)
+            return 2
+        seen = backends.look(backend)
+        config.choose_backend(backend.name, args.model, path)
+        print(f"wrote {path}: backend {backend.name}"
+              + (f", model {args.model}" if args.model else ", the program's default model"))
+        if not seen["program"]:
+            print(f"warning: `{backend.program}` is not on PATH; runs will fail until it is installed")
+        elif not seen["signin"]:
+            print(f"warning: no sign-in was found for {backend.title}; to sign in: {backend.signin_hint}")
+        if backend.note:
+            print(f"note: {backend.note}")
+        print(NO_CONFINEMENT + f" With {backend.title}, {backend.confines_act}.")
+        return 0
+    llm, found = _config_show(path)
+    usable = [row for row in found if row["program"]]
+    if llm.get("command") or llm.get("backend") or not usable or not sys.stdin.isatty():
+        return 0
+    reply = input(f"\nUse which one? [1-{len(found)}, Enter to leave unset]: ").strip()
+    if not reply:
+        return 0
+    if not reply.isdigit() or not 1 <= int(reply) <= len(found):
+        print("not a number in the list; nothing was changed", file=sys.stderr)
+        return 2
+    args.action, args.name = "set", found[int(reply) - 1]["name"]
+    return cmd_config(args)
+
+
 def cmd_answer(args) -> int:
     store = Store(Path(args.dir).resolve())
     if args.question_id:
@@ -248,6 +323,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("set", help="owner setting for the execution mode")
     p.add_argument("dir"); p.add_argument("mode", choices=config.MODES); p.set_defaults(func=cmd_set)
+
+    p = sub.add_parser("config", help="show or choose the LLM backend for this user")
+    p.add_argument("action", nargs="?", choices=["set"]); p.add_argument("name", nargs="?")
+    p.add_argument("--model", help="model name passed to the agent program")
+    p.add_argument("--user-config", help="write this file in place of ~/.config/ravl/config.toml")
+    p.set_defaults(func=cmd_config)
 
     p = sub.add_parser("answer", help="answer the loop's open questions for its owner")
     p.add_argument("dir"); p.add_argument("question_id", nargs="?"); p.add_argument("text", nargs="*")
