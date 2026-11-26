@@ -12,7 +12,8 @@ ACT_REPORT = """{"effects": ["<path of each file you created or changed, relativ
  "summary": "<one or two sentences: what you did and what state you left>",
  "procedure": ["<each command or step you performed that produced the effect, in order, exact enough to repeat>"],
  "resources_used": ["<names from the resource list, and loop names whose learnings you used>"],
- "needs_owner": null}"""
+ "needs_owner": null,
+ "ask": null}"""
 
 
 def _checks(results: list[dict]) -> str:
@@ -86,6 +87,9 @@ finish; a later phase records what was learned.
 # Owner's answers to earlier questions
 {_bullets(ctx['answers'])}
 
+# Questions already waiting for the owner (do not ask these again)
+{_bullets(ctx.get('waiting', []))}
+
 # Domain learnings of this loop
 {_bullets(ctx['domain'])}
 
@@ -109,6 +113,12 @@ finish; a later phase records what was learned.
 - If the outcome cannot be produced without a decision, a credential or an action that
   only the owner can supply, do not guess and do not work around it. Stop, and state
   exactly what the owner must do in "needs_owner" (a string; otherwise null).
+- You may put one question to the owner in "ask" (a string; otherwise null) when the
+  answer would let this or a later run do better and you cannot find it out yourself:
+  a fact about their situation, a preference, something only they can observe. Carry on
+  with the work on your best assumption and say in your summary what you assumed. Make
+  the question complete without this run for context, and answerable in a sentence. Do
+  not ask what is already waiting or already answered above.
 - Do nothing that cannot be undone unless the intent explicitly asks for it.
 
 End your reply with one fenced json block of this form:
@@ -144,6 +154,9 @@ happened and write guidance for later runs. You take no action and change nothin
 # Already recorded: domain learnings
 {_bullets(ctx['domain'])}
 
+# Questions already waiting for the owner
+{_bullets(ctx.get('waiting', []))}
+
 # Already recorded: execution constraints
 {_bullets(ctx['constraints'])}
 
@@ -162,6 +175,9 @@ happened and write guidance for later runs. You take no action and change nothin
    succeed until the owner acts or the world changes.
 5. What should the owner be asked? Ask only when a decision or action by the owner is
    needed. State what happened, what was tried, and the exact action or decision needed.
+   When Verify passed, ask only what the Act record shows was guessed and what the
+   owner alone can settle; otherwise null. Do not repeat a question from the Act record's
+   "ask" or one listed as waiting below.
 6. What did this run establish that is not already recorded below? Most runs establish
    nothing new; then both lists are empty. Do not restate the specification, and do not
    rephrase an entry that is already recorded.

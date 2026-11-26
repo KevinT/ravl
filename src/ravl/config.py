@@ -40,6 +40,11 @@ DEFAULTS: dict = {
         "max_repair_attempts": 2,  # failed LLM-driven attempts on one condition before the owner is asked
         "escalate_hours": 24,    # a failure with no question after this long is put to the owner
     },
+    # `command` is the argv of a program that carries a question to the loop's parent. It
+    # receives the question as one JSON object on standard input; exit status 0 means the
+    # question was sent. With no command, questions wait in the loop until somebody reads
+    # them. `max_open` is the most questions one loop may have waiting at a time.
+    "ask": {"command": None, "max_open": 3, "timeout_s": 60},
     "budget": {"llm_calls_per_window": 12, "window_hours": 24},
     "read": {"radius": 1},
     "codegen": {"whitelist": []},

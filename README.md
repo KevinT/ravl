@@ -4,10 +4,10 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.5.0. The runner covers build steps 1 to 9 of
+> Pre-release, version 0.6.0. The runner covers build steps 1 to 9 of
 > [`specifications/first-loop.md`](https://github.com/KevinT/ravl/blob/main/specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
-> 0020 are implemented and still proposed. Read the model first.
+> 0021 are implemented and still proposed. Read the model first.
 
 ## Install and run
 
@@ -70,6 +70,22 @@ command = ["/path/to/an/agent-adapter"]
 In Act the agent runs with its approval prompts off, because nobody is present to answer
 them. **ravl does not confine a run yet.** Until it does, run loops you have not read
 inside a sandbox of your own.
+
+A loop may ask its parent a question, whether or not its outcome holds, and carries on
+with its best assumption. At most three questions wait in one loop. To have them carried
+to you, name a command; it receives each question once, as JSON on standard input.
+[`contrib/ask/append-to-file`](https://github.com/KevinT/ravl/tree/main/contrib/ask/append-to-file) is an example.
+
+```toml
+[ask]
+command = ["/path/to/a/program"]
+```
+
+```sh
+ravl ask my-loops --list                       # open questions, and whether each was sent
+ravl ask my-loops                              # send the ones not yet sent
+ravl answer my-loops/some-loop q-001 "..."     # record the reply; the next run reads it
+```
 
 On a terminal, `ravl run` shows each phase as it runs and its result when it ends, and
 `list`, `show`, `config` and `runs <dir> <run-id>` are drawn in the same style. When the

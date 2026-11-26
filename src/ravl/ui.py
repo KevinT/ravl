@@ -239,7 +239,8 @@ class RunDisplay:
 def question_panel(question: dict, loop: str) -> Panel:
     body = Group(Text(question["text"]),
                  Text(f'\nto answer:  ravl answer {short(loop)} {question["id"]} "…"', style="dim"))
-    return Panel(body, title=f"question for the loop's parent · {question['id']}", title_align="left",
+    sent = " · sent" if question.get("delivered") else ""
+    return Panel(body, title=f"question for the loop's parent · {question['id']}{sent}", title_align="left",
                  border_style="yellow", padding=(0, 1))
 
 

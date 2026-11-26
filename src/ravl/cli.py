@@ -391,6 +391,51 @@ def cmd_config(args) -> int:
     return _config_set(args, user, None)
 
 
+def cmd_ask(args) -> int:
+    """Send the waiting questions of every loop under a directory to their parent."""
+    from . import ask
+    root = Path(args.dir).resolve()
+    user = Path(args.user_config) if args.user_config else None
+    rows, failed, unconfigured = [], 0, 0
+    for loop_dir in discover(root):
+        store = Store(loop_dir)
+        try:
+            cfg = config.load(loop_dir, user)
+        except config.ConfigError as exc:
+            print(f"ravl: {loop_dir}: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+        results = {} if args.list else {r["id"]: r for r in ask.deliver(store, cfg)}
+        for question in store.open_questions():
+            result = results.get(question["id"])
+            if result and result["sent"]:
+                state = "sent now"
+            elif result:
+                state, failed = f"not sent: {result['error']}", failed + 1
+            elif question.get("delivered"):
+                state = f"sent {question['delivered']}"
+            elif not cfg["ask"].get("command"):
+                state, unconfigured = "waiting: no ask command is configured", unconfigured + 1
+            else:
+                state = "waiting" + (f": last attempt failed ({question['delivery_error']})"
+                                     if question.get("delivery_error") else "")
+            rows.append({"loop": str(loop_dir), "id": question["id"], "asked": question["asked"],
+                         "state": state, "text": question["text"]})
+    if args.json:
+        print(json.dumps(rows, indent=2))
+    else:
+        for row in rows:
+            rel = Path(row["loop"]).relative_to(root) if Path(row["loop"]) != root else Path(".")
+            print(f"{rel}  {row['id']}  {row['state']}\n    {row['text']}")
+        if not rows:
+            print("no open questions")
+        if unconfigured:
+            print("\nTo have questions carried to you, name a command under [ask] in a settings file:\n"
+                  '    [ask]\n    command = ["/path/to/a/program"]\n'
+                  "It receives each question as JSON on standard input. Answer with: ravl answer DIR ID \"...\"")
+    return 1 if failed else 0
+
+
 def cmd_answer(args) -> int:
     store = Store(Path(args.dir).resolve())
     if args.question_id:
@@ -449,6 +494,13 @@ def main(argv: list[str] | None = None) -> int:
                                  "which applies to every loop in it and below")
     p.add_argument("--user-config", help="write this file in place of ~/.config/ravl/config.toml")
     p.set_defaults(func=cmd_config)
+
+    p = sub.add_parser("ask", help="send waiting questions to the loops' parent through the configured command")
+    p.add_argument("dir", nargs="?", default=".")
+    p.add_argument("--list", action="store_true", help="show the open questions and whether each was sent; send nothing")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--user-config", help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_ask)
 
     p = sub.add_parser("answer", help="answer the loop's open questions for its owner")
     p.add_argument("dir"); p.add_argument("question_id", nargs="?"); p.add_argument("text", nargs="*")

@@ -195,6 +195,15 @@ Steer entries have three possible addressees:
 A steer entry addressed to the owner is written into the loop's own directory. The loop
 does not know who the owner is or where the owner's files are. The owner reads it.
 
+A question is the one entry the owner is expected to reply to. A loop asks in two
+situations. When a failing condition needs the owner, Learn asks once for that condition,
+and the question closes when the condition goes away. When the loop is working on an
+assumption that only the owner can settle, Act or Learn asks whether or not the outcome
+holds, the loop carries on, and the question waits until it is answered. At most three
+questions wait in one loop. A command the owner configures carries each question to the
+owner once; the loop does not know where it goes. The reply is recorded with
+`ravl answer` and is read by the next run.
+
 Two rules apply inside Learn:
 
 - **Classify the failure before changing anything.** Every failure is classified as

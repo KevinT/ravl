@@ -7,15 +7,17 @@ produce the outcome is recorded, and the record is the next run's input.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
+import re
 import shutil
 import time
 from datetime import timedelta
 from pathlib import Path
 
-from . import __version__, codegen, config, llm, prompts, spec as specmod, verify
-from .store import Store, Trace, iso, parse_iso, readable, utcnow, window_llm_calls, write_atomic
+from . import __version__, ask as askmod, codegen, config, llm, prompts, spec as specmod, verify
+from .store import ASKED, Store, Trace, iso, parse_iso, readable, utcnow, window_llm_calls, write_atomic
 
 
 TEMPFAIL = 75   # sysexits.h EX_TEMPFAIL: an implementation's declared world failure
@@ -73,6 +75,12 @@ def run(loop_dir: Path, user_config: Path | None = None, observe=None) -> dict:
         tell("begin", "learn")
         learned = _learn(spec, cfg, store, state, reflect, act, post, env, trace)
         tell("end", "learn", learned)
+
+        # Carry waiting questions to the loop's parent, when a command for that is
+        # configured. A question that could not be sent stays recorded and is tried again.
+        sent = askmod.deliver(store, cfg)
+        if sent:
+            trace.data["ask"] = sent
 
         trace.finish()
         tell("finish", "", {"trace": trace.data, "steer": _steer_line(store),
@@ -190,6 +198,7 @@ def _reflect(spec, cfg, store, state, previous, env, trace) -> dict:
         "last_run": last_run,
         "steer": store.steer_text("reflect.md"),
         "answers": [f"{q['text']} -> {q['answer']}" for q in store.questions() if q.get("answer")][-10:],
+        "waiting": [q["text"] for q in store.open_questions()],
         "domain": [d["text"] for d in store.domain()][-40:],
         "constraints": store.constraints(),
         "neighbours": neighbours,
@@ -282,7 +291,7 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         "loop_dir": str(store.dir), "spec_raw": spec.raw, "precheck": world["checks"],
         "verifier_raw": spec.verifier_raw,
         "last_run": reflect["last_run"], "steer": reflect["steer"], "answers": reflect["answers"],
-        "domain": reflect["domain"],
+        "waiting": reflect["waiting"], "domain": reflect["domain"],
         "neighbours": [e for n in reflect["neighbours"] for e in n["entries"]],
         "constraints": [c["text"] for c in reflect["constraints"]],
         "resources": [f"{k}: {v}" for k, v in reflect["resources"].items()],
@@ -311,6 +320,7 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         "procedure": [str(s) for s in report.get("procedure", [])][:60],
         "resources_used": [str(s) for s in report.get("resources_used", [])],
         "needs_owner": report.get("needs_owner") or None,
+        "ask": str(report["ask"]).strip()[:1000] if report.get("ask") else None,
         "effects": _confirm([str(e) for e in report.get("effects", [])], store.dir, trace.started),
     }
 
@@ -519,6 +529,19 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     if status == "fail" and question:
         asked = store.ask(condition, str(question), trace.data["run_id"])
         record["question"] = asked["id"] if asked else None
+    # Questions the loop asks of its own accord, which do not depend on a failure: what
+    # Act put in "ask", and what Learn asks about a run that passed. Each is recorded once
+    # (the same wording is not recorded twice) and only while fewer than `ask.max_open`
+    # questions are waiting, so a loop cannot fill its parent's attention.
+    own = [act.get("ask")] + ([judgement.get("question")] if status == "pass" else [])
+    record["asked"], record["not_asked"] = [], 0
+    for text in [str(t).strip() for t in own if t and str(t).strip()]:
+        digest = hashlib.sha1(" ".join(re.findall(r"[a-z0-9]+", text.lower())).encode()).hexdigest()[:12]
+        asked = store.ask(ASKED + digest, text, trace.data["run_id"], max_open=int(cfg["ask"]["max_open"]))
+        if asked:
+            record["asked"].append(asked["id"])
+        else:
+            record["not_asked"] += 1
     if status == "no-verifier":
         why = trace.data.get("verifier", {}).get("reason")
         store.ask("no-verifier", "No criterion has a check, so this loop cannot tell whether its "
@@ -568,6 +591,7 @@ def _ask_learn(spec, cfg, store, reflect, act, post, env, trace, record) -> dict
         "act": {k: v for k, v in act.items() if k != "driver"},
         "postcheck": post["checks"], "steer": reflect["steer"],
         "domain": reflect["domain"], "constraints": [c["text"] for c in reflect["constraints"]],
+        "waiting": reflect["waiting"],
     })
     trace.save("learn-prompt.md", prompt)
     result = llm.call(command, prompt, store.dir, {**env, "RAVL_PHASE": "learn"},

@@ -85,6 +85,12 @@ def read_jsonl(path: Path) -> list[dict]:
     return out
 
 
+# The condition of a question a loop asked of its own accord, as opposed to one raised
+# by a failing condition. Such a question stays open until it is answered: it is not
+# closed when the outcome holds or the failing condition changes.
+ASKED = "asked:"
+
+
 class Store:
     def __init__(self, loop_dir: Path):
         self.dir = Path(loop_dir)
@@ -157,11 +163,14 @@ class Store:
     def open_questions(self) -> list[dict]:
         return [q for q in self.questions() if not q.get("answer") and not q.get("closed")]
 
-    def ask(self, condition: str, text: str, run_id: str) -> dict | None:
-        """Record a question unless one is already open for the same condition."""
+    def ask(self, condition: str, text: str, run_id: str, max_open: int | None = None) -> dict | None:
+        """Record a question unless one is already open for the same condition, or
+        `max_open` questions are already waiting."""
         questions = self.questions()
-        if any(q["condition"] == condition for q in questions
-               if not q.get("answer") and not q.get("closed")):
+        waiting = [q for q in questions if not q.get("answer") and not q.get("closed")]
+        if any(q["condition"] == condition for q in waiting):
+            return None
+        if max_open is not None and len(waiting) >= max_open:
             return None
         question = {"id": f"q-{len(questions) + 1:03d}", "condition": condition, "text": text.strip(),
                     "asked": iso(utcnow()), "run": run_id, "answer": None, "answered": None,
@@ -169,6 +178,15 @@ class Store:
         questions.append(question)
         write_json(self.steer / "questions.json", questions)
         return question
+
+    def mark_question(self, question_id: str, **fields) -> None:
+        """Set fields on one question (what became of its delivery)."""
+        questions = self.questions()
+        for question in questions:
+            if question["id"] == question_id:
+                question.update(fields)
+                write_json(self.steer / "questions.json", questions)
+                return
 
     def answer(self, question_id: str, text: str) -> bool:
         questions = self.questions()
@@ -183,7 +201,8 @@ class Store:
         """Close open questions whose condition no longer holds."""
         questions, closed = self.questions(), 0
         for question in questions:
-            if not question.get("closed") and question["condition"] not in keep:
+            if (not question.get("closed") and question["condition"] not in keep
+                    and not question["condition"].startswith(ASKED)):
                 question["closed"] = f"{iso(utcnow())} {reason}"
                 closed += 1
         if closed:
