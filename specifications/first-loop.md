@@ -102,6 +102,20 @@ loop is to replace one such script with a loop and observe whether the loop repa
 itself where the script only reported. This introduces children and budgets. It is
 specified after the first loop has run to step 7.
 
+### Status, 2026-11-26
+
+The class has been taken up before the first loop reached every step with a real LLM:
+0.1.0 runs a private tree of maintenance loops (data feeds that must stay current, a
+service that must stay connected), started hourly by an external scheduler. Each
+replaces or sits beside a hand-written check. That use is what required Reflect to run
+the verifier and Learn to hold
+([`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](../.about/decisions/0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md),
+[`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](../.about/decisions/0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md)).
+The loops are siblings in container directories; none has children yet, so parent
+loops, budget cascade and absorption of a removed child's learnings remain unbuilt and
+unexercised. What to observe, per the paragraph above: whether a loop repairs where the
+check it replaced only reported, and whether a repeated repair becomes code.
+
 ## How specification proceeds from here
 
 - A run that behaves as the model predicts confirms the model. Nothing is written.
