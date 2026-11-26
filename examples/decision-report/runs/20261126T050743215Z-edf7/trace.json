@@ -1,0 +1,154 @@
+{
+  "act": {
+    "driver": "llm",
+    "effects": [
+      {
+        "claim": "report.md",
+        "confirmed": true
+      }
+    ],
+    "error": null,
+    "needs_owner": null,
+    "ok": true,
+    "procedure": [
+      "cd to the loop directory",
+      "n=$(grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | wc -l)",
+      "wrote date +%F, $n, then for each sorted file with status: Proposed the first '# Decision Record' heading without '# ' into report.md"
+    ],
+    "reported": true,
+    "resources_used": [],
+    "summary": "Rewrote report.md with today's date, the count of proposed decision records (5), and one heading line per proposed record in order of record number."
+  },
+  "cost": {
+    "checks_run": 8,
+    "cost_usd": 0.086,
+    "llm_calls": 2,
+    "llm_wall_s": 14.37,
+    "network_calls": null,
+    "tokens": {
+      "claude-sonnet-5-5": {
+        "input": 60451,
+        "output": 687
+      }
+    },
+    "wall_s": 14.43
+  },
+  "ended": "2026-11-26T05:07:57Z",
+  "learn": {
+    "classification": null,
+    "domain_added": 0,
+    "execution_added": 0,
+    "fault": null,
+    "llm": true,
+    "mode_change": null,
+    "question": null,
+    "reason": "Verify passed after Act: report.md exists, was written this run, and its date, count and heading lines all match the criteria."
+  },
+  "loop": "/home/trek/Source/personal/ventures/ravl/examples/decision-report",
+  "ravl_version": "0.1.0",
+  "reflect": {
+    "answers": [],
+    "budget": {
+      "limit": 12,
+      "llm_calls_in_window": 2,
+      "window_hours": 24
+    },
+    "constraints": [],
+    "domain": [],
+    "last_run": "Run 20261126T050726191Z-dce7 complete; verify: pass; act: llm.",
+    "mode": {
+      "setting": "learned",
+      "source": "learned",
+      "value": "llm"
+    },
+    "neighbours": [],
+    "resources": {},
+    "steer": "<!-- written by Learn, run 20261126T050726191Z-dce7 -->\nKeep the same approach: derive the list from the front matter 'status: Proposed' line and sort by record number. Reflect should run the verifier first and skip Act if report.md is already current. Do not rely on the Act summary alone; the verifier is the check.",
+    "world": {
+      "checks": [
+        {
+          "exit": 1,
+          "id": "c-5503fe7e",
+          "output": "",
+          "status": "fail",
+          "text": "`report.md` exists and was written during this run.",
+          "wall_s": 0.0
+        },
+        {
+          "exit": 0,
+          "id": "c-62dd87f4",
+          "output": "",
+          "status": "pass",
+          "text": "The first line is today's date in ISO 8601.",
+          "wall_s": 0.0
+        },
+        {
+          "exit": 0,
+          "id": "c-a1a3e554",
+          "output": "",
+          "status": "pass",
+          "text": "The second line is the number of decision records whose front matter has `status: Proposed`.",
+          "wall_s": 0.01
+        },
+        {
+          "exit": 0,
+          "id": "c-0e9461bc",
+          "output": "",
+          "status": "pass",
+          "text": "Each further line is the heading of one proposed record, in order of record number.",
+          "wall_s": 0.01
+        }
+      ],
+      "failing": [
+        "c-5503fe7e"
+      ],
+      "fingerprint": "ffd330da4a",
+      "status": "fail",
+      "unchecked": []
+    }
+  },
+  "run_id": "20261126T050743215Z-edf7",
+  "started": "2026-11-26T05:07:43Z",
+  "status": "complete",
+  "verify": {
+    "checks": [
+      {
+        "exit": 0,
+        "id": "c-5503fe7e",
+        "output": "",
+        "status": "pass",
+        "text": "`report.md` exists and was written during this run.",
+        "wall_s": 0.0
+      },
+      {
+        "exit": 0,
+        "id": "c-62dd87f4",
+        "output": "",
+        "status": "pass",
+        "text": "The first line is today's date in ISO 8601.",
+        "wall_s": 0.0
+      },
+      {
+        "exit": 0,
+        "id": "c-a1a3e554",
+        "output": "",
+        "status": "pass",
+        "text": "The second line is the number of decision records whose front matter has `status: Proposed`.",
+        "wall_s": 0.01
+      },
+      {
+        "exit": 0,
+        "id": "c-0e9461bc",
+        "output": "",
+        "status": "pass",
+        "text": "Each further line is the heading of one proposed record, in order of record number.",
+        "wall_s": 0.01
+      }
+    ],
+    "failing": [],
+    "fingerprint": null,
+    "reused_reflect": false,
+    "status": "pass",
+    "unchecked": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "code_fail_streak": 0,
+  "codegen_declined": 0,
+  "llm_pass_runs": [
+    "20261126T050726191Z-dce7",
+    "20261126T050743215Z-edf7",
+    "20261126T050758716Z-8bbe"
+  ],
+  "llm_pass_streak": 3,
+  "mode": "code",
+  "relevance": {},
+  "resources_contributed": []
+}
