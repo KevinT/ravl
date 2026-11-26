@@ -22,7 +22,11 @@ def _mode_label(cfg_mode: str, state: dict) -> str:
 def summary(loop_dir: Path) -> dict:
     """The state of a loop without running it."""
     store = Store(loop_dir)
-    state, traces = store.state(), store.traces()
+    try:
+        initial = "code" if specmod.load(loop_dir).act else "llm"
+    except specmod.SpecError:
+        initial = "llm"
+    state, traces = store.state(initial), store.traces()
     last = traces[-1] if traces else None
     passes = 0
     for trace in reversed(traces):

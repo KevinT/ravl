@@ -54,6 +54,13 @@ LLM, so the state of an outcome can be read when no LLM is reachable. A criterio
 no check is recorded as unchecked; a loop with no checks has no verifier yet
 ([`0014-verifier-criteria-carry-checks`](../../decisions/0014-verifier-criteria-carry-checks.md), proposed).
 
+The specification may carry the implementation. An Act section with an `act` block is
+the owner's own code for Act: it runs on every run with no LLM, a solution failure
+starts a bounded number of LLM-driven repair attempts, a repair that passes hands Act
+back to the implementation, and when the attempts are used up the owner is asked. This
+is how an existing scheduled job becomes a loop without a second loop to watch it
+([`0017-a-specification-may-carry-its-implementation-and-repair-is-bounded`](../../decisions/0017-a-specification-may-carry-its-implementation-and-repair-is-bounded.md), proposed).
+
 A specification is one of two files in the loop's directory:
 
 - `ravl.md` — intent and verifier in plain language. Act starts LLM-driven.

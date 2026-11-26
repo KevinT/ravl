@@ -38,3 +38,4 @@ force, nearest scope first.
 | [`0014-verifier-criteria-carry-checks`](0014-verifier-criteria-carry-checks.md) | Proposed | A criterion may carry a check script; Verify runs checks only, with no LLM |
 | [`0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds`](0015-reflect-runs-the-verifier-and-act-is-skipped-when-the-outcome-holds.md) | Proposed | A run in which the outcome already holds costs the checks only |
 | [`0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition`](0016-learn-may-hold-the-next-act-and-asks-the-owner-once-per-condition.md) | Proposed | A failure only the owner can remove is attempted once and asked about once |
+| [`0017-a-specification-may-carry-its-implementation-and-repair-is-bounded`](0017-a-specification-may-carry-its-implementation-and-repair-is-bounded.md) | Proposed | An `act` block is the owner's implementation: it runs every run; repair by an LLM is attempted twice, then the owner is asked |

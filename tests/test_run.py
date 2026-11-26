@@ -132,7 +132,7 @@ def test_llm_outage_during_act_is_a_world_failure_with_a_question(h):
     trace = h.run(loop)
     assert trace["act"]["driver"] == "llm" and trace["act"]["ok"] is False
     assert trace["learn"]["classification"] == "world"
-    assert "LLM was unavailable" in h.store(loop).open_questions()[0]["text"]
+    assert "Learn could not classify" in h.store(loop).open_questions()[0]["text"]
 
 
 def test_budget_exhaustion_blocks_llm_driven_act(h):

@@ -4,10 +4,10 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.1.0. The runner covers build steps 1 to 9 of
+> Pre-release, version 0.2.0. The runner covers build steps 1 to 9 of
 > [`specifications/first-loop.md`](specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
-> 0016 are implemented and still proposed. Read the model first.
+> 0017 are implemented and still proposed. Read the model first.
 
 ## Install and run
 
@@ -45,6 +45,33 @@ exit status; no LLM takes part in Verify.
 - `export.csv` was written during this run.
   ```check
   test export.csv -nt "$RAVL_RUN_DIR/started"
+  ```
+```
+
+### Turning an existing scheduled job into a loop
+
+Put the command the scheduler ran into an `act` block and point the scheduler at
+`ravl run <dir>`. The implementation runs on every run with no LLM. When it stops
+meeting the verifier, the failure is classified once; a solution failure gets up to two
+LLM-driven repair attempts, and then the owner is asked. While the loop waits, the
+implementation still runs, so a cause removed by hand is noticed on the next run.
+
+```markdown
+## Act
+
+```act
+/usr/local/bin/export-orders --yesterday > export.csv
+```
+
+## Verifier
+
+- The export ran to completion in this run.
+  ```check
+  test -e "$RAVL_RUN_DIR/act-ok"
+  ```
+- `export.csv` has at least one order.
+  ```check
+  test "$(wc -l < export.csv)" -ge 1
   ```
 ```
 

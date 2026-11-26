@@ -20,9 +20,13 @@ budget, but named no mechanism for "do not attempt again yet".
 ## Decision
 
 1. The identity of a failing condition is the set of failing criteria. Check output,
-   times and counts are not part of it.
-2. When Learn classifies a failure it may set a **hold**: the next runs perform no Act
-   while the same condition persists. A hold is set when Learn judges that another
+   times and counts are not part of it. The set seen at Reflect can differ from the set
+   left after Act (a criterion such as "written during this run" always fails before
+   Act), so a hold records both and is in force when either recurs.
+2. When Learn classifies a failure it may set a **hold**: the next runs make no
+   LLM-driven attempt while the same condition persists. (A loop that carries its own
+   implementation still runs it under a hold; see
+   `0017-a-specification-may-carry-its-implementation-and-repair-is-bounded`.) A hold is set when Learn judges that another
    attempt cannot succeed until the owner acts or the world changes, or when Act itself
    reported that it needs the owner.
 3. A hold ends when the set of failing criteria changes, when the owner answers a

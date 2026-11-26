@@ -19,6 +19,8 @@ import time
 import tomllib
 from pathlib import Path
 
+OUTPUT_LIMIT = 4000
+
 PEP723 = re.compile(r"(?m)^# /// script\s*$\n(?P<body>(?:^#.*$\n)*?)^# ///\s*$")
 
 
@@ -70,6 +72,24 @@ def validate(program: str, whitelist: list[str], constraints: list[dict]) -> lis
         except re.error:
             continue
     return problems
+
+
+def run_owner(script: str, loop_dir: Path, env: dict, timeout_s: int) -> dict:
+    """Run the implementation the owner wrote in the specification's `act` block."""
+    shell = shutil.which("bash") or "/bin/sh"
+    started = time.time()
+    try:
+        proc = subprocess.run([shell, "-c", script], capture_output=True, text=True, cwd=loop_dir,
+                              env={**os.environ, **env}, timeout=timeout_s)
+    except subprocess.TimeoutExpired as exc:
+        partial = ((exc.stdout or b"") + (exc.stderr or b""))
+        partial = partial.decode("utf-8", "replace") if isinstance(partial, bytes) else str(partial)
+        return {"ok": False, "exit": None, "error": f"timed out after {timeout_s}s",
+                "output": partial[-OUTPUT_LIMIT:], "wall_s": round(time.time() - started, 2)}
+    output = (proc.stdout + proc.stderr).strip()
+    return {"ok": proc.returncode == 0, "exit": proc.returncode,
+            "error": None if proc.returncode == 0 else f"exit {proc.returncode}",
+            "output": output[-OUTPUT_LIMIT:], "wall_s": round(time.time() - started, 2)}
 
 
 def run(program_path: Path, loop_dir: Path, env: dict, timeout_s: int) -> dict:

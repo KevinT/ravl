@@ -29,6 +29,8 @@ DEFAULTS: dict = {
         "promote_after": 3,      # consecutive LLM-driven passes before code is generated
         "hold_hours": 24,        # how long a hold written by Learn stays in force
         "never_lock_after": 3,   # declined code generations before proposing never-lock
+        "max_repair_attempts": 2,  # failed LLM-driven attempts on one condition before the owner is asked
+        "escalate_hours": 24,    # a failure with no question after this long is put to the owner
     },
     "budget": {"llm_calls_per_window": 12, "window_hours": 24},
     "read": {"radius": 1},

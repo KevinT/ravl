@@ -3,8 +3,10 @@
 The specification is plain language. The library reads three things from it and
 nothing else: the title, the Intent section, and the Verifier section's criteria.
 A criterion may carry a fenced `check` block: a shell script whose exit status
-decides the criterion (0 passes). Everything else in the file is for the owner and
-for the LLM that performs Act, which is given the whole file.
+decides the criterion (0 passes). An optional Act section may carry a fenced `act`
+block: the owner's own implementation of Act, run on every run in place of an LLM.
+Everything else in the file is for the owner and for the LLM that performs or
+repairs Act, which is given the whole file.
 """
 
 from __future__ import annotations
@@ -56,6 +58,7 @@ class Spec:
     intent: str
     criteria: list[Criterion]
     raw: str
+    act: str | None = None   # the owner's implementation, when the specification carries one
 
 
 def is_loop(directory: Path) -> bool:
@@ -111,6 +114,14 @@ def _criteria(body: str) -> list[Criterion]:
     return out
 
 
+def _act(body: str) -> str | None:
+    """The first fenced `act` block of the Act section: a shell script that performs Act."""
+    match = re.search(r"(?ms)^[ \t]*```act[ \t]*\n(.*?)^[ \t]*```[ \t]*$", body)
+    if not match:
+        return None
+    return textwrap.dedent(match.group(1)).strip() or None
+
+
 def load(loop_dir: Path) -> Spec:
     path = Path(loop_dir) / SPEC_FILE
     if not path.is_file():
@@ -120,4 +131,5 @@ def load(loop_dir: Path) -> Spec:
                  Path(loop_dir).name)
     sections = _sections(raw)
     return Spec(path=path, title=title, intent=sections.get("intent", ""),
-                criteria=_criteria(sections.get("verifier", "")), raw=raw)
+                criteria=_criteria(sections.get("verifier", "")), raw=raw,
+                act=_act(sections.get("act", "")))

@@ -30,7 +30,7 @@ def run(loop_dir: Path, user_config: Path | None = None) -> dict:
                   + f"{int(moment * 1000) % 1000:03d}Z-" + os.urandom(2).hex())
         previous = _close_crashed(store)
         trace = Trace(store, run_id, __version__)
-        state = store.state()
+        state = store.state("code" if spec.act else "llm")
         env = {"RAVL_LOOP_DIR": str(loop_dir), "RAVL_RUN_ID": run_id,
                "RAVL_RUN_DIR": str(trace.dir), "RAVL_RUN_STARTED": str(int(trace.started))}
 
@@ -98,6 +98,10 @@ def _reflect(spec, cfg, store, state, previous, env, trace) -> dict:
                     f"act: {previous.get('act', {}).get('driver', 'not reached')}.")
         if previous.get("status") == "crashed":
             last_run += " It stopped before finishing; its trace shows the last phase reached."
+        before = previous.get("act", {})
+        if previous.get("verify", {}).get("status") == "fail" and (before.get("output") or before.get("error")):
+            last_run += (f"\nIts Act ({before.get('driver')}) ended with: {before.get('error') or 'exit 0'}\n"
+                         + "\n".join(f"  | {line}" for line in str(before.get("output", "")).splitlines()[-30:]))
 
     record = {
         "mode": mode,
@@ -120,13 +124,20 @@ def _reflect(spec, cfg, store, state, previous, env, trace) -> dict:
 
 def _act(spec, cfg, store, state, reflect, env, trace) -> dict:
     record = _act_inner(spec, cfg, store, state, reflect, env, trace)
+    if record["driver"] in ("code", "llm") and record.get("ok"):
+        # A check can require that Act was performed in this run:
+        #   test -e "$RAVL_RUN_DIR/act-ok"
+        (trace.dir / "act-ok").write_text(record["driver"] + "\n")
     trace.phase("act", record)
     return record
 
 
 def _hold_in_force(store, state, cfg, fingerprint) -> bool:
+    # The failing set seen at Reflect can differ from the one left after Act (a
+    # criterion such as "written during this run" always fails before Act), so a
+    # hold records both and is in force when either recurs.
     hold = state.get("hold")
-    if not hold or hold.get("fingerprint") != fingerprint:
+    if not hold or fingerprint not in (hold.get("fingerprint"), hold.get("reflect_fingerprint")):
         return False
     since = parse_iso(hold["since"])
     if utcnow() - since > timedelta(hours=float(cfg["learn"]["hold_hours"])):
@@ -139,7 +150,16 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
     world, mode = reflect["world"], reflect["mode"]
     if world["status"] == "pass":
         return {"driver": "none", "reason": "the outcome already holds"}
-    if world["status"] == "fail" and _hold_in_force(store, state, cfg, world["fingerprint"]):
+    held = world["status"] == "fail" and _hold_in_force(store, state, cfg, world["fingerprint"])
+
+    if spec.act and (mode["value"] == "code" or held):
+        # The owner's implementation runs on every run in which no repair attempt
+        # is due. Under a hold it still runs: it costs no LLM call, and it is how
+        # the loop notices that the cause was removed.
+        result = codegen.run_owner(spec.act, store.dir, {**env, "RAVL_PHASE": "act"},
+                                   int(cfg["run"]["code_timeout_s"]))
+        return {"driver": "code", "source": "owner", "held": held, **result, "effects": []}
+    if held:
         return {"driver": "held", "reason": state["hold"].get("reason", "held by the last Learn")}
 
     if mode["value"] == "code":
@@ -173,6 +193,9 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         "constraints": [c["text"] for c in reflect["constraints"]],
         "resources": [f"{k}: {v}" for k, v in reflect["resources"].items()],
         "children_editable": bool(cfg["children"]["editable"]),
+        "owner_act": spec.act,
+        "attempt": int(state.get("repair", {}).get("attempts", 0)) + 1,
+        "max_attempts": int(cfg["learn"]["max_repair_attempts"]),
     })
     trace.save("act-prompt.md", prompt)
     result = llm.call(command, prompt, store.dir, {**env, "RAVL_PHASE": "act"},
@@ -230,6 +253,7 @@ def _verify(spec, cfg, loop_dir, reflect, act, env, trace) -> dict:
 def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     """Classify the run, decide whether the execution mode changes, write steer."""
     driver, status, mode = act["driver"], post["status"], reflect["mode"]
+    learned = mode["source"] == "learned"
     record: dict = {"llm": False, "classification": None, "mode_change": None, "question": None}
     criteria = {c["id"]: c["text"] for c in post["checks"]}
     failing_text = "; ".join(criteria[i] for i in post["failing"])
@@ -238,29 +262,42 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     if unconfirmed:
         record["effect"] = "claimed but not produced: " + ", ".join(unconfirmed)
 
+    # A failure of code with the same failing criteria and the same exit as the one
+    # already judged is the same event again; it is not sent to the LLM a second time.
+    signature = f"{post['fingerprint']}|{driver}|{act.get('exit')}|{act.get('ok')}"
     judgement: dict = {}
-    if driver in ("llm", "code") and status in ("pass", "fail") and (status == "fail" or driver == "llm"):
+    if status == "fail" and driver == "code" and state.get("judged", {}).get("signature") == signature:
+        judgement = {k: state["judged"].get(k) for k in ("classification", "fault", "reason", "hold")}
+        record["judgement"] = "reused"
+    elif driver in ("llm", "code") and status in ("pass", "fail") and (status == "fail" or driver == "llm"):
         judgement = _ask_learn(spec, cfg, store, reflect, act, post, env, trace, record)
+        if status == "fail" and judgement and driver == "code":
+            state["judged"] = {"signature": signature, **{k: judgement.get(k) for k in
+                                                         ("classification", "fault", "reason", "hold")}}
 
     if status == "pass":
-        state.pop("hold", None)
+        for key in ("hold", "judged", "repair", "failing_since"):
+            state.pop(key, None)
         store.close_questions("the outcome holds again", keep={"never-lock"})
     elif status == "fail":
+        state.setdefault("failing_since", iso(utcnow()))
         store.close_questions("the failing condition changed",
                               keep={condition, "never-lock"} | ({"budget"} if act.get("budget") else set()))
 
     # Question 8: world or solution. Without an LLM judgement, only what the trace shows.
     classification = judgement.get("classification")
     if status == "fail" and classification not in ("world", "solution"):
-        if driver == "blocked" or act.get("ok") is False:
+        if driver == "blocked":
             classification = "world" if act.get("world", True) else "solution"
+        elif driver == "llm" and act.get("ok") is False:
+            classification = "world"   # the LLM itself could not be reached or did not finish
         elif driver == "held":
             classification = state.get("hold", {}).get("classification", "world")
         else:
             classification = "unclassified"
     record["classification"] = classification if status == "fail" else None
     record["fault"] = judgement.get("fault") if status == "fail" else None
-    record["reason"] = str(judgement.get("reason", ""))[:500]
+    record["reason"] = str(judgement.get("reason") or "")[:500]
 
     # Streaks that drive the execution mode.
     if driver == "llm":
@@ -272,16 +309,36 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     if driver == "code":
         state["code_fail_streak"] = 0 if status == "pass" else state["code_fail_streak"] + 1
 
-    # Questions 8-9: a solution failure on code moves the loop back to LLM-driven.
-    if (driver == "code" and status == "fail" and mode["source"] == "learned"
-            and (classification == "solution" or act.get("rejected") or state["code_fail_streak"] >= 2)):
-        rejected = store.generated.parent / "rejected" / f"act-{trace.data['run_id']}.py"
-        rejected.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(store.generated), str(rejected))
+    # Questions 8-9: a solution failure of code makes the next Act LLM-driven. A world
+    # failure does not. An unclassified failure does after two runs in a row.
+    code_is_at_fault = (classification == "solution" or act.get("rejected")
+                        or (classification == "unclassified" and state["code_fail_streak"] >= 2))
+    if driver == "code" and status == "fail" and learned and state["mode"] == "code" and code_is_at_fault:
+        if spec.act:
+            record["mode_change"] = ("code-driven -> LLM-driven: the owner's implementation does not "
+                                     "meet the verifier; the next Act is a repair attempt")
+        else:
+            rejected = store.generated.parent / "rejected" / f"act-{trace.data['run_id']}.py"
+            rejected.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(store.generated), str(rejected))
+            record["mode_change"] = "code-driven -> LLM-driven: the generated code no longer meets the verifier"
         state.update(mode="llm", code_fail_streak=0, llm_pass_streak=0, llm_pass_runs=[])
-        record["mode_change"] = "code-driven -> LLM-driven: the generated code no longer meets the verifier"
+    if spec.act and learned and status == "pass" and state["mode"] == "llm":
+        # The repair worked, or the cause went away: the owner's implementation is Act again.
+        state.update(mode="code", llm_pass_streak=0, llm_pass_runs=[])
+        record["mode_change"] = "LLM-driven -> code-driven: the outcome holds; the owner's implementation runs again"
+
+    # Bounded repair: after max_repair_attempts on one condition the owner is asked.
+    exhausted = False
+    if driver == "llm" and status == "fail":
+        repair = state.get("repair", {})
+        attempts = repair.get("attempts", 0) + 1 if repair.get("fingerprint") == post["fingerprint"] else 1
+        state["repair"] = {"fingerprint": post["fingerprint"], "attempts": attempts}
+        exhausted = attempts >= int(cfg["learn"]["max_repair_attempts"])
+        record["repair_attempts"] = attempts
 
     # Hold and question for the owner.
+    evidence = str(act.get("summary") or act.get("output") or act.get("error") or "")[-600:]
     question = judgement.get("question") or act.get("needs_owner")
     if status == "fail" and driver == "blocked":
         if act.get("budget"):
@@ -289,11 +346,21 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
         question = (f"Verifier fails ({failing_text}) and Act could not run: {act['reason']}. "
                     "Either act on the failing criteria yourself or change this loop's configuration.")
     if status == "fail" and driver in ("llm", "code") and not judgement and not question:
-        question = (f"Verifier fails ({failing_text}) after Act, and Learn could not classify the "
-                    f"failure because the LLM was unavailable ({record.get('llm_error', 'no LLM command')}).")
-    if status == "fail" and driver != "held":
-        if judgement.get("hold") or act.get("needs_owner"):
-            state["hold"] = {"fingerprint": post["fingerprint"], "since": iso(utcnow()),
+        question = (f"Verifier fails ({failing_text}) after Act ({driver}), and Learn could not classify "
+                    f"the failure ({record.get('llm_error') or 'no LLM available'}). Act ended with: {evidence}")
+    if exhausted and not question:
+        question = (f"{state['repair']['attempts']} repair attempts did not restore the outcome "
+                    f"({failing_text}). {record['reason']} Last attempt: {evidence}")
+    since = parse_iso(state["failing_since"]) if state.get("failing_since") else utcnow()
+    overdue = utcnow() - since >= timedelta(hours=float(cfg["learn"]["escalate_hours"]))
+    if status == "fail" and overdue and not question:
+        question = (f"The outcome has not held since {state['failing_since']} ({failing_text}). "
+                    f"Classified as {classification}: {record['reason'] or 'no reason recorded'} "
+                    f"Last Act ({driver}) ended with: {evidence}")
+    if status == "fail" and driver != "held" and not act.get("held"):
+        if judgement.get("hold") or act.get("needs_owner") or exhausted:
+            state["hold"] = {"fingerprint": post["fingerprint"],
+                             "reflect_fingerprint": reflect["world"]["fingerprint"], "since": iso(utcnow()),
                              "classification": classification,
                              "reason": str(judgement.get("reason") or act.get("reason")
                                            or "waiting for the owner")[:300]}
@@ -308,15 +375,15 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
                   "criterion in ravl.md.", trace.data["run_id"])
 
     # Learnings, kept apart: domain is context, execution is enforced.
-    if judgement:
+    if judgement and record.get("judgement") != "reused":
         stamp = {"run": trace.data["run_id"], "at": iso(utcnow())}
         record["domain_added"] = store.add_domain(
             [{"text": str(d.get("text", "")), "scope": d.get("scope", "local"), **stamp}
-             for d in judgement.get("domain", []) if isinstance(d, dict)])
+             for d in judgement.get("domain") or [] if isinstance(d, dict)])
         record["execution_added"] = store.add_constraints(
             [{"text": str(e.get("text", "")), "forbid": e.get("forbid") or None, **stamp}
-             for e in judgement.get("execution", []) if isinstance(e, dict)])
-        used = {str(c) for c in judgement.get("contributed", [])} | set(act.get("resources_used", []))
+             for e in judgement.get("execution") or [] if isinstance(e, dict)])
+        used = {str(c) for c in judgement.get("contributed") or []} | set(act.get("resources_used", []))
         for neighbour in reflect["neighbours"]:
             seen = state["relevance"].setdefault(neighbour["loop"], {"offered": 0, "contributed": 0})
             seen["offered"] += 1
@@ -324,8 +391,8 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
         if status == "pass" and driver == "llm":
             state["resources_contributed"] = sorted(used & set(reflect["resources"]))
 
-    # Question 10: ready to move toward code-driven?
-    if (driver == "llm" and status == "pass" and mode["source"] == "learned"
+    # Question 10: ready to move toward code-driven? Never over an owner's implementation.
+    if (driver == "llm" and status == "pass" and learned and not spec.act
             and state["llm_pass_streak"] >= int(cfg["learn"]["promote_after"])):
         _generate(spec, cfg, store, state, reflect, env, trace, record)
 
@@ -339,8 +406,13 @@ def _ask_learn(spec, cfg, store, reflect, act, post, env, trace, record) -> dict
     command = config.llm_command(cfg, "learn")
     if not command:
         return {}
+    budget = reflect["budget"]
+    if budget["llm_calls_in_window"] + trace.data["cost"]["llm_calls"] >= budget["limit"]:
+        record["llm_error"] = "LLM budget for the window is spent"
+        return {}
     prompt = prompts.learn({
-        "intent": spec.intent, "driver": act["driver"], "precheck": reflect["world"]["checks"],
+        "intent": spec.intent, "driver": act["driver"], "owner_act": bool(spec.act),
+        "precheck": reflect["world"]["checks"],
         "act": {k: v for k, v in act.items() if k != "driver"},
         "postcheck": post["checks"], "steer": reflect["steer"],
         "domain": reflect["domain"], "constraints": [c["text"] for c in reflect["constraints"]],
@@ -422,6 +494,7 @@ def _write_steer(spec, store, state, reflect, act, post, record, judgement, trac
     lines = [f"# {spec.title}: for the owner", "",
              f"- Verify: {status}" + (f" ({'; '.join(criteria[i] for i in post['failing'])})" if post["failing"] else ""),
              f"- Act: {driver}" + (f" ({act.get('summary') or act.get('reason') or act.get('error') or ''})".replace(" ()", "")),
+             *([f"- Hold: since {state['hold']['since']}: {state['hold']['reason']}"] if state.get("hold") else []),
              f"- Execution mode: {'code-driven' if state['mode'] == 'code' else 'LLM-driven'} "
              f"({reflect['mode']['setting']})"]
     if record.get("classification"):

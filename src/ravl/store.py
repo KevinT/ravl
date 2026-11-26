@@ -110,9 +110,9 @@ class Store:
             handle.close()
 
     # ---- state
-    def state(self) -> dict:
+    def state(self, initial_mode: str = "llm") -> dict:
         state = read_json(self.learnings / "state.json", {})
-        state.setdefault("mode", "llm")
+        state.setdefault("mode", initial_mode)
         for key in ("llm_pass_streak", "code_fail_streak", "codegen_declined"):
             state.setdefault(key, 0)
         state.setdefault("llm_pass_runs", [])

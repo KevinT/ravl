@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ravl"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reflect, Act, Verify, Learn: loops for outcomes that recur. Each run checks its own result and leaves guidance for the next."
 readme = "README.md"
 license = "MPL-2.0"

@@ -29,6 +29,22 @@ def _bullets(items: list[str], empty: str = "(none)") -> str:
     return "\n".join(f"- {item}" for item in items) or empty
 
 
+def _owner_act(ctx: dict) -> str:
+    if not ctx.get("owner_act"):
+        return ""
+    return f"""# This is a repair attempt ({ctx['attempt']} of {ctx['max_attempts']})
+The Act section of the specification holds the owner's implementation. It normally
+performs Act on every run with no LLM. It has stopped meeting the verifier, so this run
+is yours. Find why it no longer produces the outcome and repair the cause, within what
+you are permitted to change. Then run the implementation yourself, exactly as the Act
+block states it, so that this run produces the outcome. You may not edit the Act block;
+if the repair is a change to it, give the exact change in "needs_owner". After
+{ctx['max_attempts']} failed attempts the owner is asked, so a precise account of what
+you found is worth more than a guess.
+
+"""
+
+
 def act(ctx: dict) -> str:
     child_rule = (
         "You may create, edit and remove child loops: subdirectories of the loop directory "
@@ -70,7 +86,7 @@ finish; a later phase records what was learned.
 # Resources available to this run
 {_bullets(ctx['resources'])}
 
-# Rules
+{_owner_act(ctx)}# Rules
 - Do what is needed for every verifier criterion to pass, and no more.
 - You may write inside the loop directory and to whatever the intent names. Do not edit
   this loop's ravl.md or config/, and do not write under learnings/ or runs/.
@@ -97,7 +113,7 @@ happened and write guidance for later runs. You take no action and change nothin
 {ctx['intent'] or '(none written)'}
 
 # Execution mode of this run
-{ctx['driver']} ({'code performed Act' if ctx['driver'] == 'code' else 'an LLM performed Act'})
+{ctx['driver']} ({("the owner's implementation performed Act" if ctx.get('owner_act') else 'generated code performed Act') if ctx['driver'] == 'code' else ('an LLM made a repair attempt because the owner\'s implementation had failed' if ctx.get('owner_act') else 'an LLM performed Act')})
 
 # Verifier before Act
 {_checks(ctx['precheck'])}
@@ -121,7 +137,10 @@ happened and write guidance for later runs. You take no action and change nothin
 1. Did Verify pass? If it passed, classification is null.
 2. If it failed: is the cause WORLD (an external service is down, data is absent, a
    credential has expired, a transient error, something only the owner can supply) or
-   SOLUTION (the approach taken was wrong)?
+   SOLUTION (the approach taken was wrong, or something on this side that a repair
+   attempt could change is broken: a moved program, a changed path, stale state, a
+   defect in the implementation)? Classifying a code failure as SOLUTION starts an
+   LLM-driven repair attempt on the next run; classifying it as WORLD does not.
 3. If SOLUTION: is the fault in the SPECIFICATION (the intent or verifier is ambiguous or
    wrong, so the owner must change it) or in the DERIVATION (the intent is clear and this
    attempt was a wrong way to meet it)?
