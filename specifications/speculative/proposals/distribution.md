@@ -48,13 +48,13 @@ Three things are kept separate, each with one location:
 
 | Thing | Location | Versioned by |
 |---|---|---|
-| The library and `ravl` command | Installed once per host with `uv tool install ravl` | `uv tool upgrade ravl`; version reported by `ravl --version` |
+| The library and `ravl` command | Installed once per host with `uv tool install ravl-cli` | `uv tool upgrade ravl-cli`; version reported by `ravl --version` |
 | Loops (`ravl.md` and `config/`) | Any directory, usually a Git repository | The owner, in Git |
 | State (`runs/`, `learnings/`) | Beside each loop by default; relocatable by configuration | Not committed by default; the owner opts specific learnings in |
 
 ### One installation per host
 
-`uv tool install ravl` is the only installation for running and developing loops. It
+`uv tool install ravl-cli` is the only installation for running and developing loops. It
 places one `ravl` command on the path, in its own isolated environment managed by
 `uv`. A loops repository needs no `pyproject.toml`, no virtual environment and no
 dependency declaration; it is a directory tree of `ravl.md` files.

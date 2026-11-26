@@ -4,22 +4,25 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.4.0. The runner covers build steps 1 to 9 of
-> [`specifications/first-loop.md`](specifications/first-loop.md): one loop, run from the
+> Pre-release, version 0.4.1. The runner covers build steps 1 to 9 of
+> [`specifications/first-loop.md`](https://github.com/KevinT/ravl/blob/main/specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
 > 0019 are implemented and still proposed. Read the model first.
 
 ## Install and run
 
 ```sh
-uv tool install git+https://github.com/KevinT/ravl     # one installation per host
-uv tool upgrade ravl                                   # later, to update it
+uv tool install ravl-cli                               # one installation per host; the command is `ravl`
+uv tool upgrade ravl-cli                               # later, to update it
 ravl config                                            # shows the agent programs it found; choose one
 ravl new my-loop                                       # writes my-loop/ravl.md
 $EDITOR my-loop/ravl.md                                # intent, and criteria with checks
 ravl run my-loop                                       # one run: Reflect, Act, Verify, Learn
 ravl list                                              # every loop below here, with its state
 ```
+
+The package is named `ravl-cli` on PyPI because PyPI refused `ravl` as too similar to an
+existing project. The command and the Python package it installs are both `ravl`.
 
 `ravl run` needs an LLM for Act and Learn, and for Act it must be an agent: a program that
 can change files and run commands. ravl has no agent of its own. It ships backends for
@@ -45,7 +48,7 @@ model = "haiku"
 
 For any other agent, name a command in place of a backend. It reads a prompt on standard
 input and writes its reply on standard output; `RAVL_PHASE` tells it which phase it is in.
-[`contrib/backends/claude-code`](contrib/backends/claude-code) is an example.
+[`contrib/backends/claude-code`](https://github.com/KevinT/ravl/tree/main/contrib/backends/claude-code) is an example.
 
 ```toml
 [llm]
@@ -114,7 +117,7 @@ After three consecutive LLM-driven passes Learn asks for a program that performs
 checks it (parses, declared dependencies on the whitelist, no recorded execution
 constraint violated) and switches the loop to code-driven. A solution failure of that
 code switches it back. `ravl set <dir> lock | never-lock | learned` overrides this.
-[`examples/decision-report`](examples/decision-report) is the first loop, with its runs
+[`examples/decision-report`](https://github.com/KevinT/ravl/tree/main/examples/decision-report) is the first loop, with its runs
 and learnings committed: three LLM-driven runs, then code-driven runs with no LLM call.
 
 Tests: `uv run pytest`.
@@ -123,15 +126,15 @@ Tests: `uv run pytest`.
 
 | Question | Read |
 |---|---|
-| What is this a part of, and what are its trust boundaries? | [`.about/purpose.md`](.about/purpose.md) |
-| How do I reason about a loop? | [`.about/mental-models/ravl-loop/model.md`](.about/mental-models/ravl-loop/model.md) |
-| What must the library never do? | [`.about/principles.md`](.about/principles.md) |
-| Where does it sit on the alignment stack, and what is that? | [`.about/situates.md`](.about/situates.md) |
-| Why was it decided this way? | [`.about/decisions/`](.about/decisions/README.md) |
-| What gets built first, and what is the kill criterion? | [`specifications/first-loop.md`](specifications/first-loop.md) |
-| What is carried from RavlGPT, adapted, or left behind? | [`specifications/reference/ravlgpt-guardrails.md`](specifications/reference/ravlgpt-guardrails.md) |
-| How is it installed and run? | [`0012-one-install-per-host-and-the-command-line-first`](.about/decisions/0012-one-install-per-host-and-the-command-line-first.md) (proposed), from [`distribution.md`](specifications/speculative/proposals/distribution.md) |
-| I am an agent working in this repo | [`AGENTS.md`](AGENTS.md) |
+| What is this a part of, and what are its trust boundaries? | [`.about/purpose.md`](https://github.com/KevinT/ravl/blob/main/.about/purpose.md) |
+| How do I reason about a loop? | [`.about/mental-models/ravl-loop/model.md`](https://github.com/KevinT/ravl/blob/main/.about/mental-models/ravl-loop/model.md) |
+| What must the library never do? | [`.about/principles.md`](https://github.com/KevinT/ravl/blob/main/.about/principles.md) |
+| Where does it sit on the alignment stack, and what is that? | [`.about/situates.md`](https://github.com/KevinT/ravl/blob/main/.about/situates.md) |
+| Why was it decided this way? | [`.about/decisions/`](https://github.com/KevinT/ravl/blob/main/.about/decisions/README.md) |
+| What gets built first, and what is the kill criterion? | [`specifications/first-loop.md`](https://github.com/KevinT/ravl/blob/main/specifications/first-loop.md) |
+| What is carried from RavlGPT, adapted, or left behind? | [`specifications/reference/ravlgpt-guardrails.md`](https://github.com/KevinT/ravl/blob/main/specifications/reference/ravlgpt-guardrails.md) |
+| How is it installed and run? | [`0012-one-install-per-host-and-the-command-line-first`](https://github.com/KevinT/ravl/blob/main/.about/decisions/0012-one-install-per-host-and-the-command-line-first.md) (proposed), from [`distribution.md`](https://github.com/KevinT/ravl/blob/main/specifications/speculative/proposals/distribution.md) |
+| I am an agent working in this repo | [`AGENTS.md`](https://github.com/KevinT/ravl/blob/main/AGENTS.md) |
 
 ## Repository layout
 
@@ -153,8 +156,8 @@ specifications/    what is being built next
 `ravl` re-derives the concepts first developed in
 [KevinT/RavlGPT](https://github.com/KevinT/RavlGPT). That repository is kept whole as
 evidence; no code is ported from it
-([`0000-rebuild-from-concepts-not-from-code`](.about/decisions/0000-rebuild-from-concepts-not-from-code.md)).
+([`0000-rebuild-from-concepts-not-from-code`](https://github.com/KevinT/ravl/blob/main/.about/decisions/0000-rebuild-from-concepts-not-from-code.md)).
 
 ## Licence
 
-[Mozilla Public License 2.0](LICENSE).
+[Mozilla Public License 2.0](https://github.com/KevinT/ravl/tree/main/LICENSE).

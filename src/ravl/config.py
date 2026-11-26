@@ -89,7 +89,7 @@ def load(loop_dir: Path, user_config: Path | None = None) -> dict:
         if minimum and _version_tuple(minimum) > _version_tuple(__version__):
             raise ConfigError(
                 f"{root / TREE_FILE} requires ravl >= {minimum}; this is {__version__}. "
-                "Upgrade with: uv tool upgrade ravl")
+                "Upgrade with: uv tool upgrade ravl-cli")
         _merge(cfg, tree)
     loop_file = loop_dir / "config" / "loop.toml"
     if loop_file.is_file():

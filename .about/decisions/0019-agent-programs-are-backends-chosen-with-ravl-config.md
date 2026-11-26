@@ -12,7 +12,7 @@ history:
 
 `0013-the-llm-is-a-command-the-owner-configures` makes the LLM a command the owner
 names, and puts adapters for particular agents outside the package, under `contrib/`.
-Two things follow that the owner does not want. A fresh `uv tool install ravl` has no
+Two things follow that the owner does not want. A fresh `uv tool install ravl-cli` has no
 adapter at all, so its first run reports that no LLM is configured. And the owner must
 find an adapter's path and write its argv into a file by hand.
 
