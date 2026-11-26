@@ -4,6 +4,7 @@ date: 2026-11-26
 deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — the owner asked for `ravl config`, said ravl must not assume that any particular agent program is installed (Hermes or Claude, for example), asked that setup be as smooth as possible by supporting the standard options, and pointed at the open-source Hermes Agent's handling of providers as something to reuse. He approved building 'detection and the installed-agent backends first' before reading this text. Implemented in 0.4.0 for two programs, of which Claude Code has been run end to end and Codex has not; the backend for a bare API key and the sandbox are separate records still to be written"
+  - "2026-11-26: Point 4 and point 5 extended in 0.5.0 — a first use showed that choosing a program with no model silently ran the program's largest model; the owner asked that the model be asked for, and for a way to set it for a folder and everything below it"
 ---
 
 # Decision Record 0019: Agent programs are backends shipped in the package and chosen with `ravl config`
@@ -41,12 +42,21 @@ copied in this step.
 4. **The first backends are agent programs the owner already has**: `claude` (Claude
    Code) and `codex` (Codex CLI). ravl stores no credential for them; each program uses
    its own sign-in. `[llm] model`, and `[llm.<phase>] model`, are passed to the program
-   as its model option.
+   as its model option. With no model set the program uses its own default, and
+   `ravl config` says so in those words wherever it shows the settings.
 5. **`ravl config` shows what is set and what it found**: for each backend, whether the
    program is on `PATH` and whether its sign-in is present. It finds this out by looking
    at `PATH` and at the existence of the program's sign-in file. It starts no program
    and reads no credential. On a terminal with nothing configured it offers the found
-   programs as a numbered choice. `ravl config set <name> [--model M]` writes the choice.
+   programs as a numbered choice and then asks for the model: one of the names the
+   backend lists, another name, or the program's own default chosen explicitly. The
+   program and the model are written together; leaving the model question empty writes
+   nothing. `ravl config set [NAME] [--model M]` writes the choice for the machine, and a
+   model given alone changes the model and keeps the program.
+   `ravl config set [NAME] [--model M] --dir FOLDER` writes `ravl.toml` in that folder,
+   which applies to every loop in it and below (`0012`, point 3). `ravl config --dir
+   FOLDER` lists every settings file that applies there and what is in effect for each
+   phase.
 6. **ravl never chooses a backend by itself.** Until the owner has chosen, a run does no
    Act and says how to configure one. An agent is not started with its approval prompts
    off on a machine whose owner has not asked for that.

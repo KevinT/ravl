@@ -34,8 +34,20 @@ agent programs you may already have, each of which uses its own sign-in:
 | `codex` | Codex CLI | written from the program's help text; not yet run against a signed-in Codex |
 
 `ravl config` shows which of them are on `PATH` and whether a sign-in was found. It starts
-no program and reads no credential. `ravl config set claude --model sonnet` writes the
-choice to `~/.config/ravl/config.toml`. ravl never chooses one by itself.
+no program and reads no credential. Run on a terminal with nothing configured, it asks
+which program to use and then which model. ravl never chooses a program by itself. With
+no model set, the program uses its own default, which may be its largest and slowest.
+
+```sh
+ravl config set claude --model sonnet          # this machine: ~/.config/ravl/config.toml
+ravl config set --model haiku                  # this machine: change the model only
+ravl config set --model opus --dir my-loops    # my-loops/ravl.toml: that folder and everything below
+ravl config --dir my-loops/some-loop           # the files that apply there, and what is in effect
+```
+
+Settings are read from the machine file, then from every `ravl.toml` on the path from the
+top folder down to the loop, then from `config/loop.toml` in the loop itself. A nearer
+file overrides a farther one setting by setting. Any of them may hold:
 
 ```toml
 [llm]

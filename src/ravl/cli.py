@@ -242,27 +242,46 @@ NO_CONFINEMENT = ("In Act the agent runs with its approval prompts off, because 
                   "answer them.\nravl does not confine a run yet.")
 
 
-def _config_show(path: Path) -> tuple[dict, list[dict]]:
+def _phase_lines(effective: dict) -> list[tuple[str, str]]:
+    """The settings in effect as (label, text) lines: one line when every phase is the same."""
+    def text(row: dict) -> str:
+        if row["via"] is None:
+            return "not configured: a run performs no Act and derives no verifier"
+        if row["via"] == "command":
+            return f"command: {row['name']}"
+        return f"{row['name']}, " + (f"model {row['model']}" if row["model"] else
+                                     "no model set: the program uses its own default")
+    rows = [(phase, text(effective[phase])) for phase in config.PHASES]
+    return [("every phase", rows[0][1])] if len({t for _, t in rows}) == 1 else rows
+
+
+def _layer_text(llm: dict) -> str:
+    parts = [f"{key} {' '.join(map(str, llm[key])) if key == 'command' else llm[key]}"
+             for key in ("command", "backend", "model") if llm.get(key)]
+    parts += [f"{phase}: " + ", ".join(f"{k} {v}" for k, v in llm[phase].items())
+              for phase in config.PHASES if isinstance(llm.get(phase), dict) and llm[phase]]
+    return "; ".join(parts) or "no LLM settings"
+
+
+def _config_show(user: Path, directory: Path) -> tuple[dict, list[dict]]:
     from . import backends   # the registry is read here and by the adapter process, not by a run
-    llm = config._read(path).get("llm", {}) if path.is_file() else {}
+    layers = config.layers(directory, user)
+    effective = config.effective(config.load(directory, user))
     found = backends.look_all()
     out = _terminal()
     if out is not None:
         from . import ui
-        ui.config(out, path, llm, found, NO_CONFINEMENT)
-        return llm, found
-    print(f"settings file   {path}" + ("" if path.is_file() else "  (not written yet)"))
-    if llm.get("command"):
-        print(f"LLM             command: {' '.join(map(str, llm['command']))}")
-    elif llm.get("backend"):
-        print(f"LLM             backend: {llm['backend']}"
-              + (f", model {llm['model']}" if llm.get("model") else ", the program's default model"))
-    else:
-        print("LLM             not configured: a run performs no Act and derives no verifier")
-    for phase in ("act", "learn", "codegen", "derive"):
-        over = llm.get(phase)
-        if isinstance(over, dict) and over:
-            print(f"  {phase:<13} " + ", ".join(f"{k} {v}" for k, v in over.items()))
+        rows = [(layer["level"], layer["path"],
+                 _layer_text(layer["llm"]) if layer["exists"] else "not written yet") for layer in layers]
+        ui.config(out, directory, rows, _phase_lines(effective), found, NO_CONFINEMENT, CONFIG_USAGE)
+        return layers[0]["llm"], found
+    print(f"Settings files that apply in {directory}, later overriding earlier:")
+    for layer in layers:
+        print(f"  {layer['level']:<8} {layer['path']}  "
+              + (_layer_text(layer["llm"]) if layer["exists"] else "(not written yet)"))
+    print("In effect:")
+    for label, text in _phase_lines(effective):
+        print(f"  {label:<12} {text}")
     print("\nAgent programs ravl has a backend for:")
     for number, row in enumerate(found, 1):
         program = f"on PATH ({row['program']})" if row["program"] else "not on PATH"
@@ -273,27 +292,65 @@ def _config_show(path: Path) -> tuple[dict, list[dict]]:
         if row["note"]:
             print(f"     note: {row['note']}")
     print("\n" + NO_CONFINEMENT)
-    print("Choose with:    ravl config set <name> [--model MODEL]")
+    print(CONFIG_USAGE)
     print("Any other agent: set `command` under [llm] in the settings file to a program that reads a\n"
           "                prompt on standard input and writes the reply on standard output.")
-    return llm, found
+    return layers[0]["llm"], found
 
 
-def cmd_config(args) -> int:
+CONFIG_USAGE = ("For this machine:          ravl config set NAME --model MODEL     (or only --model MODEL)\n"
+                "For a folder and below:    ravl config set [NAME] --model MODEL --dir FOLDER")
+
+
+def _ask_model(backend) -> str | None:
+    """Ask which model the agent program is to use. Returns its name, "" for the
+    program's own default, or None when nothing was chosen."""
+    print(f"\nModel for {backend.title}. ravl passes the name on and does not check it.")
+    for number, name in enumerate(backend.models, 1):
+        print(f"  {number}. {name}")
+    print("  d. the program's own default, whichever model that is at each run")
+    reply = input("Which? [a number, d, or another model name; Enter writes nothing]: ").strip()
+    if not reply:
+        return None
+    if reply.lower() == "d":
+        return ""
+    if reply.isdigit():
+        return backend.models[int(reply) - 1] if 1 <= int(reply) <= len(backend.models) else None
+    return reply
+
+
+def _config_set(args, user: Path, directory: Path | None) -> int:
     from . import backends
-    path = Path(args.user_config) if args.user_config else config.USER_CONFIG
-    if args.action == "set":
-        if not args.name:
-            print("give the backend name: ravl config set <name> [--model MODEL]", file=sys.stderr)
-            return 2
+    usage = "ravl config set [NAME] [--model MODEL] [--dir FOLDER]"
+    if not args.name and not args.model:
+        print(f"give an agent program, a model, or both: {usage}", file=sys.stderr)
+        return 2
+    backend = None
+    if args.name:
         backend = backends.BACKENDS.get(args.name)
         if backend is None:
             print(f"no backend named {args.name!r}; known: {', '.join(backends.BACKENDS)}", file=sys.stderr)
             return 2
+    target = directory / config.TREE_FILE if directory else user
+    view = directory or Path.cwd()
+    if backend is None:
+        # A model alone: it must have an agent program to be passed to.
+        current = config.effective(config.load(view, user))["act"]
+        if current["via"] != "backend":
+            print("a model is passed to an agent program, and "
+                  + ("the settings name a command instead" if current["via"] else "none is chosen yet")
+                  + f": {usage}", file=sys.stderr)
+            return 2
+    config.write_llm(target, backend.name if backend else None, args.model)
+    wrote = ", ".join(([f"backend {backend.name}"] if backend else [])
+                      + ([f"model {args.model}"] if args.model else ["the program's default model"]))
+    print(f"wrote {target}: {wrote}")
+    if directory:
+        print(f"In effect in {directory} and every folder below it that sets nothing else:")
+        for label, text in _phase_lines(config.effective(config.load(directory, user))):
+            print(f"  {label:<12} {text}")
+    if backend:
         seen = backends.look(backend)
-        config.choose_backend(backend.name, args.model, path)
-        print(f"wrote {path}: backend {backend.name}"
-              + (f", model {args.model}" if args.model else ", the program's default model"))
         if not seen["program"]:
             print(f"warning: `{backend.program}` is not on PATH; runs will fail until it is installed")
         elif not seen["signin"]:
@@ -301,19 +358,37 @@ def cmd_config(args) -> int:
         if backend.note:
             print(f"note: {backend.note}")
         print(NO_CONFINEMENT + f" With {backend.title}, {backend.confines_act}.")
-        return 0
-    llm, found = _config_show(path)
+    return 0
+
+
+def cmd_config(args) -> int:
+    from . import backends
+    user = Path(args.user_config) if args.user_config else config.USER_CONFIG
+    directory = Path(args.dir).resolve() if args.dir else None
+    if directory is not None and not directory.is_dir():
+        print(f"ravl: no folder {directory}", file=sys.stderr)
+        return 2
+    if args.action == "set":
+        return _config_set(args, user, directory)
+    llm, found = _config_show(user, directory or Path.cwd())
     usable = [row for row in found if row["program"]]
-    if llm.get("command") or llm.get("backend") or not usable or not sys.stdin.isatty():
+    if directory or llm.get("command") or llm.get("backend") or not usable or not sys.stdin.isatty():
         return 0
+    # Nothing is chosen for this machine and a person is present: ask for the agent
+    # program and then for the model, and write both together or neither.
     reply = input(f"\nUse which one? [1-{len(found)}, Enter to leave unset]: ").strip()
     if not reply:
         return 0
     if not reply.isdigit() or not 1 <= int(reply) <= len(found):
         print("not a number in the list; nothing was changed", file=sys.stderr)
         return 2
-    args.action, args.name = "set", found[int(reply) - 1]["name"]
-    return cmd_config(args)
+    backend = backends.BACKENDS[found[int(reply) - 1]["name"]]
+    model = _ask_model(backend)
+    if model is None:
+        print("no model was chosen; nothing was changed")
+        return 0
+    args.name, args.model = backend.name, model or None
+    return _config_set(args, user, None)
 
 
 def cmd_answer(args) -> int:
@@ -367,9 +442,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("set", help="owner setting for the execution mode")
     p.add_argument("dir"); p.add_argument("mode", choices=config.MODES); p.set_defaults(func=cmd_set)
 
-    p = sub.add_parser("config", help="show or choose the LLM backend for this user")
+    p = sub.add_parser("config", help="show or choose the agent program and model: for this machine, or for a folder")
     p.add_argument("action", nargs="?", choices=["set"]); p.add_argument("name", nargs="?")
     p.add_argument("--model", help="model name passed to the agent program")
+    p.add_argument("--dir", help="a folder: show what applies there, or with `set` write its ravl.toml, "
+                                 "which applies to every loop in it and below")
     p.add_argument("--user-config", help="write this file in place of ~/.config/ravl/config.toml")
     p.set_defaults(func=cmd_config)
 

@@ -4,6 +4,7 @@ date: 2026-11-26
 deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — written by the implementing agent while building the runner (first-loop steps 1 to 8), under the owner's instruction to build; implemented in 0.1.0; not yet reviewed by the decider"
+  - "2026-11-26: Point 3 changed in 0.5.0 — only the nearest `ravl.toml` was read, so a folder that set one value discarded everything set above it; every one on the path is now read and merged"
 ---
 
 # Decision Record 0012: One installation per host; the command line is the first surface
@@ -24,11 +25,13 @@ the recorded problems and a replacement. The runner had to be built against one 
    reading and writing files in the loop directory only. `--json` emits the same
    content as data. `ravl run` exits 0 when Verify passes, 1 when it does not, 2 when
    the run could not start, 3 when another run of the loop is in progress.
-3. Configuration is read from three files, later overriding earlier: the user file
-   `~/.config/ravl/config.toml`, `ravl.toml` at the root of a tree of loops, and
-   `config/` in the loop directory (`config/mode` for the owner's execution-mode
-   setting, `config/loop.toml` for everything else). No environment variable is read.
-4. `ravl.toml` may state `min_version`; an older library refuses to run and prints the
+3. Configuration is read from three levels, later overriding earlier: the user file
+   `~/.config/ravl/config.toml` for the machine; every `ravl.toml` in a folder at or
+   above the loop, read from the highest down, each applying to all loops beneath it
+   and a nearer one overriding a farther one setting by setting; and `config/` in the
+   loop directory (`config/mode` for the owner's execution-mode setting,
+   `config/loop.toml` for everything else). No environment variable is read.
+4. Any `ravl.toml` may state `min_version`; an older library refuses to run and prints the
    upgrade command.
 5. Generated code is one Python file with PEP 723 inline metadata. Its declared
    dependencies are checked against a whitelist before it runs. A program with no

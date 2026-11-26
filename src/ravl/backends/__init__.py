@@ -26,6 +26,7 @@ class Backend:
     confines_act: str    # a clause: what the program itself limits during Act
     proven: bool         # an end-to-end run with a signed-in program has been observed
     note: str = ""
+    models: tuple[str, ...] = ()    # names the program accepts, offered by `ravl config`; not checked
 
 
 BACKENDS: dict[str, Backend] = {b.name: b for b in (
@@ -34,7 +35,7 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
         signin_files=(".claude/.credentials.json",), signin_env=("ANTHROPIC_API_KEY",),
         signin_hint="claude auth login",
         confines_act="the program confines nothing; Act can change whatever the user can",
-        proven=True),
+        proven=True, models=("fable", "opus", "sonnet", "haiku")),
     Backend(
         name="codex", title="Codex CLI", program="codex",
         signin_files=(".codex/auth.json",), signin_env=(),
@@ -54,7 +55,7 @@ def look(backend: Backend) -> dict:
             "program": shutil.which(backend.program),
             "signin": ([f"~/{name}" for name in files] + [f"${name}" for name in env]) or None,
             "signin_hint": backend.signin_hint, "confines_act": backend.confines_act,
-            "proven": backend.proven, "note": backend.note}
+            "proven": backend.proven, "note": backend.note, "models": list(backend.models)}
 
 
 def look_all() -> list[dict]:

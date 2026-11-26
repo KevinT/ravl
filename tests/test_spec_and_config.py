@@ -51,6 +51,40 @@ def test_three_levels_later_overrides_earlier(tmp_path):
     assert cfg["mode"] == "learned"
 
 
+def test_every_folder_file_above_a_loop_applies_and_a_nearer_one_overrides_single_settings(tmp_path):
+    user = tmp_path / "user.toml"
+    user.write_text('[llm]\nbackend = "claude"\nmodel = "machine-model"\n')
+    top, mid, loop, other = tmp_path / "top", tmp_path / "top/mid", tmp_path / "top/mid/loop", tmp_path / "top/other"
+    (loop / "config").mkdir(parents=True)
+    other.mkdir()
+
+    def models(directory):
+        return {phase: row["model"] for phase, row in config.effective(config.load(directory, user)).items()}
+
+    assert set(models(loop).values()) == {"machine-model"}
+    (top / "ravl.toml").write_text('[llm]\nmodel = "top-model"\n\n[llm.act]\nmodel = "top-act"\n\n[read]\nradius = 3\n')
+    assert models(other) == {"derive": "top-model", "act": "top-act", "learn": "top-model", "codegen": "top-model"}
+    (mid / "ravl.toml").write_text('[llm]\nmodel = "mid-model"\n')
+    cfg = config.load(loop, user)
+    # The nearer file changes the one setting it holds; the rest of the farther file stands.
+    assert models(loop) == {"derive": "mid-model", "act": "top-act", "learn": "mid-model", "codegen": "mid-model"}
+    assert cfg["read"]["radius"] == 3 and cfg["tree_root"] == str(top)
+    assert models(other)["learn"] == "top-model"                    # a sibling folder is not affected
+    (loop / "config" / "loop.toml").write_text('[llm.learn]\nmodel = "loop-learn"\n')
+    assert models(loop)["learn"] == "loop-learn" and models(loop)["act"] == "top-act"
+    assert [(row["level"], row["exists"]) for row in config.layers(loop, user)] == [
+        ("machine", True), ("folder", True), ("folder", True), ("loop", True)]
+    assert config.llm_command(config.load(loop, user), "act")[-2:] == ["--model", "top-act"]
+
+
+def test_a_newer_library_may_be_required_by_any_folder_file(tmp_path):
+    (tmp_path / "ravl.toml").write_text('min_version = "99.0.0"\n')
+    (tmp_path / "below").mkdir()
+    (tmp_path / "below" / "ravl.toml").write_text('[read]\nradius = 1\n')
+    with pytest.raises(config.ConfigError, match="uv tool upgrade ravl"):
+        config.load(tmp_path / "below", tmp_path / "none.toml")
+
+
 def test_tree_may_require_a_newer_library(tmp_path):
     (tmp_path / "ravl.toml").write_text('min_version = "99.0.0"\n')
     with pytest.raises(config.ConfigError, match="uv tool upgrade ravl"):

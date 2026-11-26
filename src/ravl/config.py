@@ -1,9 +1,11 @@
-"""Configuration, resolved from three files, later overriding earlier.
+"""Configuration, resolved from three levels of file, later overriding earlier.
 
-1. User file (`~/.config/ravl/config.toml`): the LLM backend or command, set once per
-   host, by hand or with `ravl config`.
-2. `ravl.toml` at the root of a tree of loops: settings for the whole tree.
-3. `config/` in the loop directory: the owner's settings for that loop.
+1. Machine: the user file (`~/.config/ravl/config.toml`). The LLM backend or command
+   and the default model, by hand or with `ravl config`.
+2. Folder: every `ravl.toml` in a directory at or above the loop, read from the highest
+   down. Each holds settings for every loop beneath it, and a nearer file overrides a
+   farther one setting by setting. Written by hand or with `ravl config set --dir`.
+3. Loop: `config/` in the loop directory, the owner's settings for that one loop.
 
 No environment variable is read. The core names no environment: the LLM is a
 command the owner supplies, and resources are entries the owner lists.
@@ -22,6 +24,7 @@ from . import __version__
 USER_CONFIG = Path.home() / ".config" / "ravl" / "config.toml"
 TREE_FILE = "ravl.toml"
 MODES = ("lock", "never-lock", "learned")
+PHASES = ("derive", "act", "learn", "codegen")   # the phases that may call the LLM
 
 DEFAULTS: dict = {
     # `command` is the argv of a program that reads a prompt on stdin and writes the
@@ -65,12 +68,16 @@ def _read(path: Path) -> dict:
         raise ConfigError(f"{path}: {exc}") from exc
 
 
+def tree_files(directory: Path) -> list[Path]:
+    """Every `ravl.toml` at or above `directory`, the highest first."""
+    found = [d / TREE_FILE for d in [directory, *directory.parents] if (d / TREE_FILE).is_file()]
+    return found[::-1]
+
+
 def tree_root(loop_dir: Path) -> Path | None:
-    """Nearest directory at or above the loop that holds `ravl.toml`."""
-    for directory in [loop_dir, *loop_dir.parents]:
-        if (directory / TREE_FILE).is_file():
-            return directory
-    return None
+    """Highest directory at or above the loop that holds `ravl.toml`."""
+    files = tree_files(loop_dir)
+    return files[0].parent if files else None
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:
@@ -82,19 +89,19 @@ def load(loop_dir: Path, user_config: Path | None = None) -> dict:
     user = user_config or USER_CONFIG
     if user.is_file():
         _merge(cfg, _read(user))
-    root = tree_root(loop_dir)
-    if root is not None:
-        tree = _read(root / TREE_FILE)
+    files = tree_files(loop_dir)
+    for path in files:
+        tree = _read(path)
         minimum = tree.pop("min_version", None)
         if minimum and _version_tuple(minimum) > _version_tuple(__version__):
             raise ConfigError(
-                f"{root / TREE_FILE} requires ravl >= {minimum}; this is {__version__}. "
+                f"{path} requires ravl >= {minimum}; this is {__version__}. "
                 "Upgrade with: uv tool upgrade ravl-cli")
         _merge(cfg, tree)
     loop_file = loop_dir / "config" / "loop.toml"
     if loop_file.is_file():
         _merge(cfg, _read(loop_file))
-    cfg["tree_root"] = str(root) if root else None
+    cfg["tree_root"] = str(files[0].parent) if files else None
     cfg["mode"] = owner_mode(loop_dir)
     return cfg
 
@@ -144,21 +151,54 @@ def _toml(data: dict, prefix: str = "") -> list[str]:
     return lines
 
 
-def choose_backend(name: str, model: str | None, path: Path | None = None) -> Path:
-    """Record the owner's choice of backend in the user file. Other settings are kept.
+def layers(directory: Path, user_config: Path | None = None) -> list[dict]:
+    """The settings files that apply in `directory`, in the order they are merged, each
+    with the `[llm]` table it holds. For showing where a setting comes from."""
+    user = user_config or USER_CONFIG
+    rows = [("machine", user)] + [("folder", path) for path in tree_files(directory)]
+    if (directory / "config" / "loop.toml").is_file():
+        rows.append(("loop", directory / "config" / "loop.toml"))
+    return [{"level": level, "path": str(path), "exists": path.is_file(),
+             "llm": _read(path).get("llm", {}) if path.is_file() else {}} for level, path in rows]
 
-    A `command` at the top of `[llm]` is removed, because it would take precedence.
-    Comments in the file are not kept: it is rewritten from its values.
+
+def effective(cfg: dict) -> dict:
+    """For each phase that may call the LLM: what is run, and with which model.
+
+    `via` is "command", "backend" or None when nothing is configured. A model applies
+    to a backend only; None there means the agent program uses its own default.
     """
-    path = path or USER_CONFIG
+    llm, out = cfg.get("llm", {}), {}
+    for phase in PHASES:
+        specific = llm.get(phase, {}) if isinstance(llm.get(phase), dict) else {}
+        command = specific.get("command") or llm.get("command")
+        backend = specific.get("backend") or llm.get("backend")
+        if command:
+            out[phase] = {"via": "command", "name": " ".join(map(str, command)), "model": None}
+        elif backend:
+            out[phase] = {"via": "backend", "name": str(backend),
+                          "model": specific.get("model") or llm.get("model")}
+        else:
+            out[phase] = {"via": None, "name": None, "model": None}
+    return out
+
+
+def write_llm(path: Path, backend: str | None, model: str | None) -> Path:
+    """Record the owner's choice under `[llm]` in one settings file. Other settings are kept.
+
+    With a backend: it is set, a `command` at the top of `[llm]` is removed because it
+    would take precedence, and the model is set, or removed when none is given. Without
+    a backend: only the model is set. Comments in the file are not kept: it is rewritten
+    from its values.
+    """
     data = _read(path) if path.is_file() else {}
     llm = data.setdefault("llm", {})
-    llm.pop("command", None)
-    llm["backend"] = name
+    if backend:
+        llm.pop("command", None)
+        llm["backend"] = backend
+        llm.pop("model", None)
     if model:
         llm["model"] = model
-    else:
-        llm.pop("model", None)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(_toml(data)).strip() + "\n")
     return path

@@ -372,8 +372,11 @@ my_loop/
 
 The owner edits `ravl.md` (or `ravl.py`) and `config/`. `learnings/` and `runs/` are
 written by the library and can be deleted; the loop will rebuild them over subsequent
-runs. A `ravl.toml` at the root of a tree holds settings for the whole tree (minimum
-library version, learning-store location, whether parents may edit children).
+runs. A `ravl.toml` in any folder holds settings for every loop in that folder and below
+(the model each phase uses, minimum library version, whether parents may edit
+children). Every such file on the path from the top down to the loop is read, and a
+nearer one overrides a farther one setting by setting. The file for the whole machine
+is read first and the loop's own `config/` last.
 
 ## Related
 

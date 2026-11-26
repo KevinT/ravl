@@ -309,24 +309,27 @@ def show(out: Console, row: dict) -> None:
     out.print()
 
 
-def config(out: Console, path: Path, llm: dict, found: list[dict], notice: str) -> None:
+def config(out: Console, directory: Path, layers: list[tuple[str, str, str]], in_effect: list[tuple[str, str]],
+           found: list[dict], notice: str, usage: str) -> None:
+    """`layers` are (level, path, what the file sets); `in_effect` are (phase label, text)."""
     out.print()
+    out.print(Text.assemble(("Settings files that apply in ", "bold"), (short(directory), "bold cyan"),
+                            ("   later overriding earlier", "dim")))
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="dim", min_width=9)
     grid.add_column()
-    grid.add_row("settings", Text.assemble(short(path), ("" if path.is_file() else "   not written yet", "dim")))
-    if llm.get("command"):
-        grid.add_row("LLM", Text.assemble(("command  ", "bold"), " ".join(map(str, llm["command"]))))
-    elif llm.get("backend"):
-        grid.add_row("LLM", Text.assemble((str(llm["backend"]), "bold green"),
-                                          f"  ·  model {llm['model']}" if llm.get("model") else
-                                          "  ·  the program's default model"))
-    else:
-        grid.add_row("LLM", Text("not configured: a run performs no Act and derives no verifier", style="yellow"))
-    for phase in ("act", "learn", "codegen", "derive"):
-        if isinstance(llm.get(phase), dict) and llm[phase]:
-            grid.add_row(f"  {phase}", ", ".join(f"{k} {v}" for k, v in llm[phase].items()))
-    out.print(Padding(grid, (0, 0, 1, 0)))
+    grid.add_column(style="dim")
+    for level, path, text in layers:
+        grid.add_row(level, short(path), text)
+    out.print(Padding(grid, (0, 0, 0, 2)))
+    out.print(Text("In effect", style="bold"))
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="dim", min_width=11)
+    grid.add_column()
+    for label, text in in_effect:
+        unset = "not configured" in text or "no model set" in text
+        grid.add_row(label, Text(text, style="yellow" if unset else "green"))
+    out.print(Padding(grid, (0, 0, 1, 2)))
     out.print(Text("Agent programs ravl has a backend for", style="bold"))
     for number, row in enumerate(found, 1):
         program = (("✓ ", "green"), ("on PATH", "")) if row["program"] else (("✗ ", "red"), ("not on PATH", ""))
@@ -339,5 +342,5 @@ def config(out: Console, path: Path, llm: dict, found: list[dict], notice: str) 
             out.print(Padding(Text(row["note"], style="dim italic"), (0, 0, 0, 13)))
     out.print()
     out.print(Text(notice, style="yellow"))
-    out.print(Text.assemble(("choose with   ", "dim"), "ravl config set <name> [--model MODEL]"))
+    out.print(Text(usage, style="dim"))
     out.print()

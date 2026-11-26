@@ -176,3 +176,76 @@ def test_an_unconfigured_run_says_how_to_configure(machine, h, capsys):
     loop = h.loop("bare", "# Bare\n\n## Intent\n\nx\n")
     assert cli.main(["run", str(loop)]) == 1
     assert "to configure one: ravl config" in capsys.readouterr().out
+
+
+def test_config_set_with_a_folder_writes_that_folders_file_and_shows_what_is_in_effect(machine, capsys):
+    machine.install("claude", CLAUDE)
+    folder = machine.work / "loops"
+    (folder / "deep" / "er").mkdir(parents=True)
+    assert cli.main(["config", "set", "--model", "small", "--dir", str(folder)]) == 2   # no agent program yet
+    assert "none is chosen yet" in capsys.readouterr().err and not (folder / "ravl.toml").exists()
+
+    cli.main(["config", "set", "claude", "--model", "big"])
+    capsys.readouterr()
+    assert cli.main(["config", "set", "--model", "small", "--dir", str(folder)]) == 0
+    out = capsys.readouterr().out
+    assert f"wrote {folder / 'ravl.toml'}: model small" in out and "every phase  claude, model small" in out
+    assert tomllib.loads((folder / "ravl.toml").read_text()) == {"llm": {"model": "small"}}
+    assert tomllib.loads(config.USER_CONFIG.read_text())["llm"] == {"backend": "claude", "model": "big"}
+
+    (folder / "ravl.toml").write_text('[llm]\nmodel = "small"\n\n[llm.act]\nmodel = "large"\n\n[read]\nradius = 2\n')
+    assert cli.main(["config", "set", "--model", "tiny", "--dir", str(folder / "deep")]) == 0
+    capsys.readouterr()
+    assert tomllib.loads((folder / "ravl.toml").read_text())["read"] == {"radius": 2}   # the file above is untouched
+    assert cli.main(["config", "--dir", str(folder / "deep" / "er")]) == 0
+    out = capsys.readouterr().out
+    assert f"folder   {folder / 'ravl.toml'}  model small; act: model large" in out
+    assert f"folder   {folder / 'deep' / 'ravl.toml'}  model tiny" in out
+    assert "derive       claude, model tiny" in out and "act          claude, model large" in out
+    assert cli.main(["config", "set", "--dir", str(folder)]) == 2                       # nothing to set
+    assert cli.main(["config", "set", "--model", "x", "--dir", str(folder / "absent")]) == 2
+
+
+def test_a_model_alone_changes_the_machine_model_and_keeps_the_agent_program(machine, capsys):
+    machine.install("claude", CLAUDE)
+    assert cli.main(["config", "set", "--model", "small"]) == 2                         # no agent program yet
+    cli.main(["config", "set", "claude"])
+    assert "no model set: the program uses its own default" not in capsys.readouterr().out
+    assert cli.main(["config"]) == 0
+    assert "every phase  claude, no model set: the program uses its own default" in capsys.readouterr().out
+    assert cli.main(["config", "set", "--model", "small"]) == 0
+    assert tomllib.loads(config.USER_CONFIG.read_text())["llm"] == {"backend": "claude", "model": "small"}
+    config.USER_CONFIG.write_text('[llm]\ncommand = ["mine"]\n')
+    assert cli.main(["config", "set", "--model", "small"]) == 2
+    assert "name a command instead" in capsys.readouterr().err
+
+
+def test_asked_on_a_terminal_config_takes_the_program_and_the_model_together(machine, capsys, monkeypatch):
+    machine.install("claude", CLAUDE)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+
+    def answers(*replies):
+        queue = list(replies)
+        monkeypatch.setattr("builtins.input", lambda prompt="": queue.pop(0))
+
+    answers("1", "")                                   # a program, then no model
+    assert cli.main(["config"]) == 0
+    out = capsys.readouterr().out
+    assert "Model for Claude Code" in out and "the program's own default" in out
+    assert "no model was chosen; nothing was changed" in out and not config.USER_CONFIG.exists()
+
+    answers("1", "2")                                  # the second offered model
+    assert cli.main(["config"]) == 0
+    assert tomllib.loads(config.USER_CONFIG.read_text())["llm"] == {
+        "backend": "claude", "model": backends.BACKENDS["claude"].models[1]}
+
+    config.USER_CONFIG.unlink()
+    answers("1", "d")                                  # the program's own default, chosen by name
+    assert cli.main(["config"]) == 0
+    assert tomllib.loads(config.USER_CONFIG.read_text())["llm"] == {"backend": "claude"}
+    assert "the program's default model" in capsys.readouterr().out
+
+    config.USER_CONFIG.unlink()
+    answers("1", "some-other-model")
+    assert cli.main(["config"]) == 0
+    assert tomllib.loads(config.USER_CONFIG.read_text())["llm"]["model"] == "some-other-model"

@@ -117,16 +117,20 @@ def test_list_show_and_config_are_drawn(h, tmp_path):
     out = _console()
     ui.listing(out, [cli.summary(loop)], loop.parent)
     ui.show(out, cli.summary(loop))
-    ui.config(out, tmp_path / "none.toml", {}, [
+    ui.config(out, tmp_path, [("machine", str(tmp_path / "none.toml"), "not written yet"),
+                              ("folder", str(tmp_path / "ravl.toml"), "model small; act: model big")],
+              [("derive", "claude, model small"), ("act", "claude, no model set: the program uses its own default")], [
         {"name": "claude", "title": "Claude Code", "program": "/bin/claude", "signin": ["~/.x"],
          "signin_hint": "claude auth login", "confines_act": "nothing", "proven": True, "note": ""},
         {"name": "codex", "title": "Codex CLI", "program": None, "signin": None,
          "signin_hint": "codex login", "confines_act": "its own sandbox", "proven": False, "note": "unproven"}],
-        "notice text")
+        "notice text", "usage text")
     text = out.export_text()
     assert " FAIL " in text and "greeting" in text and "1 question(s)" in text
     assert "2 criteria, 1 with a check  ·  written in ravl.md" in text and "✗ `out.txt` exists." in text
-    assert "not configured" in text and "✓ on PATH" in text and "✗ not on PATH" in text
+    assert "not written yet" in text and "model small; act: model big" in text and "usage text" in text
+    assert "no model set: the program uses its own default" in text
+    assert "✓ on PATH" in text and "✗ not on PATH" in text
     assert "no sign-in found, to sign in: codex login" in text and "notice text" in text
 
 
