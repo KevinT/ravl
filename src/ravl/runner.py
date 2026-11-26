@@ -179,13 +179,25 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
             return {"driver": "blocked", "world": False,
                     "reason": "mode is set to lock and no generated code exists"}
 
+    def implementation_instead(why: str) -> dict:
+        # No repair attempt can be made in this run. The owner's implementation is
+        # still the job, so it runs: an unreachable LLM or a spent budget must not
+        # stop the work the loop exists to do.
+        result = codegen.run_owner(spec.act, store.dir, {**env, "RAVL_PHASE": "act"},
+                                   int(cfg["run"]["code_timeout_s"]))
+        return {"driver": "code", "source": "owner", "held": False, "repair_blocked": why,
+                **result, "effects": []}
+
     command = config.llm_command(cfg, "act")
-    if not command:
-        return {"driver": "blocked", "world": True, "reason": "no LLM command is configured"}
     budget = reflect["budget"]
-    if budget["llm_calls_in_window"] >= budget["limit"]:
-        return {"driver": "blocked", "world": True, "budget": True,
-                "reason": f"budget of {budget['limit']} LLM calls per {budget['window_hours']}h is spent"}
+    blocked = None
+    if not command:
+        blocked = {"driver": "blocked", "world": True, "reason": "no LLM command is configured"}
+    elif budget["llm_calls_in_window"] >= budget["limit"]:
+        blocked = {"driver": "blocked", "world": True, "budget": True,
+                   "reason": f"budget of {budget['limit']} LLM calls per {budget['window_hours']}h is spent"}
+    if blocked:
+        return implementation_instead(blocked["reason"]) if spec.act else blocked
 
     prompt = prompts.act({
         "loop_dir": str(store.dir), "spec_raw": spec.raw, "precheck": world["checks"],
@@ -204,20 +216,13 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
                       int(cfg["llm"]["timeout_s"]))
     trace.charge_llm(result)
     trace.save("act-response.md", result.text or "")
+    if spec.act and not result.ok:
+        spec_changed(store, spec, trace)   # undo any edit an unfinished attempt left in ravl.md
+        return implementation_instead(f"the LLM did not complete the repair attempt ({result.error})")
     report = llm.last_json(result.text) or {}
     # The specification is the owner's. A change made to it during Act is undone
     # here and kept in the run directory as a proposal for the owner to read.
-    spec_restored = False
-    spec_file = store.dir / "ravl.md"
-    try:
-        now = spec_file.read_text() if spec_file.is_file() else None
-    except OSError:
-        now = None
-    if now != spec.raw:
-        if now is not None:
-            trace.save("spec-proposed.md", now)
-        spec_file.write_text(spec.raw)
-        spec_restored = True
+    spec_restored = spec_changed(store, spec, trace)
     return {
         "driver": "llm", "ok": result.ok, "error": result.error, "spec_restored": spec_restored,
         "reported": bool(report),
@@ -227,6 +232,21 @@ def _act_inner(spec, cfg, store, state, reflect, env, trace) -> dict:
         "needs_owner": report.get("needs_owner") or None,
         "effects": _confirm([str(e) for e in report.get("effects", [])], store.dir, trace.started),
     }
+
+
+def spec_changed(store, spec, trace) -> bool:
+    """Undo a change made to ravl.md during Act; keep the changed text in the run directory."""
+    spec_file = store.dir / "ravl.md"
+    try:
+        now = spec_file.read_text() if spec_file.is_file() else None
+    except OSError:
+        now = None
+    if now == spec.raw:
+        return False
+    if now is not None:
+        trace.save("spec-proposed.md", now)
+    spec_file.write_text(spec.raw)
+    return True
 
 
 def _confirm(claims: list[str], loop_dir: Path, started: float) -> list[dict]:
@@ -371,6 +391,10 @@ def _learn(spec, cfg, store, state, reflect, act, post, env, trace) -> dict:
     if status == "fail" and driver in ("llm", "code") and not judgement and not question:
         question = (f"Verifier fails ({failing_text}) after Act ({driver}), and Learn could not classify "
                     f"the failure ({record.get('llm_error') or 'no LLM available'}). Act ended with: {evidence}")
+    if status == "fail" and act.get("repair_blocked") and not question:
+        question = (f"Verifier fails ({failing_text}) and no repair attempt could be made: "
+                    f"{act['repair_blocked']}. The implementation still runs on every run; "
+                    f"it ended with: {evidence}")
     if exhausted and not question:
         question = (f"{state['repair']['attempts']} repair attempts did not restore the outcome "
                     f"({failing_text}). {record['reason']} Last attempt: {evidence}")

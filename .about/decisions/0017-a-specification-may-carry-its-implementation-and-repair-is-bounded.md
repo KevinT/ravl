@@ -50,10 +50,14 @@ The model allows the specification to contain code (A1) and names `ravl.py` as t
    implementation still runs on every run. That is how the loop finds out that the
    cause was removed; it then clears the hold and closes the question without the
    owner having to answer.
-7. **No failure stays unreported.** A loop that has failed for `learn.escalate_hours`
+7. **A repair attempt that cannot be made does not stop the job.** When no LLM is
+   configured, the budget is spent, or the LLM call fails, the implementation runs in
+   that run as it would have, the attempt is not counted, and the owner is told once
+   that no repair could be attempted.
+8. **No failure stays unreported.** A loop that has failed for `learn.escalate_hours`
    (default 24) with no question open for its condition, whatever the classification,
    writes one.
-8. Learn's LLM call counts against the same rolling budget as Act's. When the budget is
+9. Learn's LLM call counts against the same rolling budget as Act's. When the budget is
    spent, the failure is recorded unclassified and the owner is asked.
 
 ## Alternatives considered

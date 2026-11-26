@@ -200,3 +200,43 @@ def test_exit_75_is_a_declared_world_failure_with_no_llm_call(h):
     assert state["mode"] == "code" and "hold" not in state and h.store(loop).open_questions() == []
     (loop / "token").write_text("renewed\n")                     # the owner renews the credential
     assert h.run(loop)["verify"]["status"] == "pass"
+
+
+def test_when_no_repair_attempt_can_be_made_the_implementation_still_runs(h):
+    loop = _job(h)
+    (loop / "source").unlink()
+    traces = [h.run(loop, llm=False) for _ in range(4)]            # no LLM at all, as when a sign-in is lost
+    assert [t["act"]["driver"] for t in traces] == ["code"] * 4    # the job itself ran every time
+    assert _state(h, loop)["mode"] == "llm"                        # a repair attempt is due and cannot be made
+    assert "no LLM command is configured" in traces[-1]["act"]["repair_blocked"]
+    assert len(h.store(loop).questions()) == 1                     # asked once
+
+    (loop / "source").write_text("v1\n")                           # the cause goes away
+    recovered = h.run(loop, llm=False)
+    assert recovered["act"]["driver"] == "code" and recovered["verify"]["status"] == "pass"
+    assert _state(h, loop)["mode"] == "code" and h.store(loop).open_questions() == []
+
+
+def test_a_spent_budget_does_not_stop_the_implementation(h):
+    loop = _job(h)
+    (loop / "config").mkdir()
+    (loop / "config" / "loop.toml").write_text("[budget]\nllm_calls_per_window = 1\n")
+    (loop / "source").unlink()
+    h.behave({"learn": learn(**SOLUTION), "act": REPAIR})
+    first = h.run(loop)                                             # classified solution: the one call is spent
+    second = h.run(loop)                                            # a repair attempt is due, the budget is gone
+    assert first["learn"]["classification"] == "solution" and h.calls() == ["learn"]
+    assert second["act"]["driver"] == "code" and "budget" in second["act"]["repair_blocked"]
+    assert "no repair attempt could be made" in h.store(loop).open_questions()[0]["text"]
+
+
+def test_an_llm_that_fails_during_a_repair_attempt_does_not_stop_the_implementation(h):
+    loop = _job(h)
+    (loop / "source").unlink()
+    h.behave({"learn": learn(**SOLUTION)})                          # the stand-in exits 3 when asked to act
+    h.run(loop)
+    attempt = h.run(loop)
+    assert h.calls()[:2] == ["learn", "act"]
+    assert attempt["act"]["driver"] == "code" and attempt["act"]["source"] == "owner"
+    assert "did not complete the repair attempt" in attempt["act"]["repair_blocked"]
+    assert "repair" not in _state(h, loop)                          # not counted as one of the two attempts
