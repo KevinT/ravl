@@ -118,10 +118,23 @@ def cmd_new(args) -> int:
     return 0
 
 
+def _terminal():
+    """A rich console when standard output is a terminal; otherwise None and plain text is printed."""
+    if not sys.stdout.isatty():
+        return None
+    from . import ui   # the display is loaded only when there is a terminal to draw on
+    return ui.console()
+
+
 def cmd_run(args) -> int:
     loop_dir = Path(args.dir).resolve()
+    out = None if args.json else _terminal()
+    observe = None
+    if out is not None:
+        from . import ui
+        observe = ui.RunDisplay(out)
     try:
-        trace = runner.run(loop_dir, Path(args.user_config) if args.user_config else None)
+        trace = runner.run(loop_dir, Path(args.user_config) if args.user_config else None, observe)
     except (specmod.SpecError, config.ConfigError) as exc:
         print(f"ravl: {exc}", file=sys.stderr)
         return 2
@@ -130,7 +143,7 @@ def cmd_run(args) -> int:
         return 3
     if args.json:
         print(json.dumps(trace, indent=2))
-    else:
+    elif out is None:
         _print_run(trace, loop_dir)
     return 0 if trace["verify"]["status"] == "pass" else 1
 
@@ -140,6 +153,11 @@ def cmd_list(args) -> int:
     rows = [summary(p) for p in discover(root)]
     if args.json:
         print(json.dumps(rows, indent=2))
+        return 0
+    out = _terminal()
+    if out is not None:
+        from . import ui
+        ui.listing(out, rows, root)
         return 0
     for row in rows:
         rel = Path(row["loop"]).relative_to(root) if Path(row["loop"]) != root else Path(".")
@@ -156,6 +174,11 @@ def cmd_show(args) -> int:
     row = summary(loop_dir)
     if args.json:
         print(json.dumps(row, indent=2))
+        return 0
+    out = _terminal()
+    if out is not None:
+        from . import ui
+        ui.show(out, row)
         return 0
     print(f"{row['title']}  ({row['loop']})")
     print(f"mode       {row['mode']}")
@@ -183,7 +206,21 @@ def cmd_runs(args) -> int:
         if not trace:
             print(f"no run {args.run_id}", file=sys.stderr)
             return 2
-        print(json.dumps(trace, indent=2))
+        out = None if args.json else _terminal()
+        if out is None:
+            print(json.dumps(trace, indent=2))
+            return 0
+        from . import ui
+        try:
+            title = specmod.load(store.dir).title
+        except specmod.SpecError:
+            title = store.dir.name
+        latest = store.last_trace() or {}
+        current = latest.get("run_id") == trace["run_id"]
+        # Steer and open questions belong to the loop as it is now, so they are shown
+        # only with its latest run.
+        ui.replay(out, trace, title, runner._steer_line(store) if current else "",
+                  store.open_questions() if current else [])
         return 0
     for trace in store.traces(last=args.last):
         cost = trace.get("cost", {})
@@ -209,6 +246,11 @@ def _config_show(path: Path) -> tuple[dict, list[dict]]:
     from . import backends   # the registry is read here and by the adapter process, not by a run
     llm = config._read(path).get("llm", {}) if path.is_file() else {}
     found = backends.look_all()
+    out = _terminal()
+    if out is not None:
+        from . import ui
+        ui.config(out, path, llm, found, NO_CONFINEMENT)
+        return llm, found
     print(f"settings file   {path}" + ("" if path.is_file() else "  (not written yet)"))
     if llm.get("command"):
         print(f"LLM             command: {' '.join(map(str, llm['command']))}")
@@ -319,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("runs", help="list runs, or print one trace")
     p.add_argument("dir"); p.add_argument("run_id", nargs="?")
+    p.add_argument("--json", action="store_true", help="with a run id: print the trace itself")
     p.add_argument("--last", type=int, default=20); p.set_defaults(func=cmd_runs)
 
     p = sub.add_parser("set", help="owner setting for the execution mode")

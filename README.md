@@ -4,10 +4,10 @@
 once, check their own result, and leave guidance for their next run. For outcomes that
 recur: each run should cost less and fail less than the one before.
 
-> Pre-release, version 0.4.1. The runner covers build steps 1 to 9 of
+> Pre-release, version 0.5.0. The runner covers build steps 1 to 9 of
 > [`specifications/first-loop.md`](https://github.com/KevinT/ravl/blob/main/specifications/first-loop.md): one loop, run from the
 > command line, moving between LLM-driven and code-driven execution. Decisions 0012 to
-> 0019 are implemented and still proposed. Read the model first.
+> 0020 are implemented and still proposed. Read the model first.
 
 ## Install and run
 
@@ -58,6 +58,10 @@ command = ["/path/to/an/agent-adapter"]
 In Act the agent runs with its approval prompts off, because nobody is present to answer
 them. **ravl does not confine a run yet.** Until it does, run loops you have not read
 inside a sandbox of your own.
+
+On a terminal, `ravl run` shows each phase as it runs and its result when it ends, and
+`list`, `show`, `config` and `runs <dir> <run-id>` are drawn in the same style. When the
+output is piped or captured the commands print plain text, and `--json` prints the data.
 
 A specification is one file. A criterion with a `check` block is decided by the block's
 exit status; no LLM takes part in Verify.
@@ -144,6 +148,7 @@ src/ravl/          the library and the `ravl` command
 tests/             phase contract, learning store, read rule, verification, constraints
 examples/          public, invented loops with their runs and learnings
 src/ravl/backends/ adapters for agent programs, run as a separate process; not core
+src/ravl/ui.py     the terminal display; a surface, not core
 contrib/backends/  an example of a custom command adapter
 specifications/    what is being built next
   first-loop.md    the first loop and the build order for the runner

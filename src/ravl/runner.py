@@ -6,6 +6,7 @@ produce the outcome is recorded, and the record is the next run's input.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import shutil
@@ -19,8 +20,21 @@ from .store import Store, Trace, iso, parse_iso, readable, utcnow, window_llm_ca
 
 TEMPFAIL = 75   # sysexits.h EX_TEMPFAIL: an implementation's declared world failure
 
-def run(loop_dir: Path, user_config: Path | None = None) -> dict:
-    """Perform one run and return its trace."""
+def run(loop_dir: Path, user_config: Path | None = None, observe=None) -> dict:
+    """Perform one run and return its trace.
+
+    `observe(event, phase, data)`, when given, is told as the run proceeds: "start",
+    then "begin" and "end" around each phase, then "finish". It is for a display. It
+    receives copies, and an error inside it does not affect the run.
+    """
+    def tell(event: str, phase: str = "", data: dict | None = None) -> None:
+        if observe is None:
+            return
+        try:
+            observe(event, phase, copy.deepcopy(data or {}))
+        except Exception:   # a display must never be able to break a run
+            pass
+
     loop_dir = Path(loop_dir).resolve()
     spec = specmod.load(loop_dir)
     cfg = config.load(loop_dir, user_config)
@@ -36,20 +50,40 @@ def run(loop_dir: Path, user_config: Path | None = None) -> dict:
         env = {"RAVL_LOOP_DIR": str(loop_dir), "RAVL_RUN_ID": run_id,
                "RAVL_RUN_DIR": str(trace.dir), "RAVL_RUN_STARTED": str(int(trace.started))}
 
-        if not spec.criteria:
+        tell("start", "", {"title": spec.title, "loop": str(loop_dir), "run_id": run_id})
+        deriving = not spec.criteria
+        if deriving:
+            tell("begin", "derive")
             spec = _assume_verifier(spec, cfg, store, env, trace)
         trace.data["verifier"] = {**trace.data.get("verifier", {}), "source": spec.verifier_source,
                                   "criteria": len(spec.criteria),
                                   "with_check": sum(1 for c in spec.criteria if c.check)}
+        if deriving:
+            tell("end", "derive", trace.data["verifier"])
 
+        tell("begin", "reflect")
         reflect = _reflect(spec, cfg, store, state, previous, env, trace)
+        tell("end", "reflect", reflect)
+        tell("begin", "act")
         act = _act(spec, cfg, store, state, reflect, env, trace)
+        tell("end", "act", act)
+        tell("begin", "verify")
         post = _verify(spec, cfg, loop_dir, reflect, act, env, trace)
-        _learn(spec, cfg, store, state, reflect, act, post, env, trace)
+        tell("end", "verify", post)
+        tell("begin", "learn")
+        learned = _learn(spec, cfg, store, state, reflect, act, post, env, trace)
+        tell("end", "learn", learned)
 
         trace.finish()
+        tell("finish", "", {"trace": trace.data, "steer": _steer_line(store),
+                            "questions": store.open_questions()})
         store.prune(int(cfg["run"].get("keep_runs", 200)))
         return trace.data
+
+
+def _steer_line(store: Store) -> str:
+    return " ".join(line for line in store.steer_text("reflect.md").splitlines()
+                    if not line.startswith("<!--")).strip()
 
 
 def _close_crashed(store: Store) -> dict | None:
@@ -314,6 +348,11 @@ def _confirm(claims: list[str], loop_dir: Path, started: float) -> list[dict]:
             out.append({"claim": claim, "confirmed": None, "note": "not a file; cannot be confirmed"})
             continue
         path = Path(claim) if os.path.isabs(claim) else loop_dir / claim
+        if not path.exists() and claim.split():
+            # A claim is often a path followed by a note, as in "out/ (12 files)".
+            first = claim.split()[0]
+            candidate = Path(first) if os.path.isabs(first) else loop_dir / first
+            path = candidate if candidate.exists() else path
         if not path.exists():
             out.append({"claim": claim, "confirmed": False, "note": "does not exist"})
         elif path.stat().st_mtime < started - 1:

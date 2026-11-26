@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ravl-cli"
-version = "0.4.1"
+version = "0.5.0"
 description = "Reflect, Act, Verify, Learn: loops for outcomes that recur. Each run checks its own result and leaves guidance for the next."
 readme = "README.md"
 license = "MPL-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["rich>=13"]
 authors = [{ name = "Kevin Trethewey" }]
 keywords = ["agents", "llm", "automation", "verification", "self-healing"]
 classifiers = [
