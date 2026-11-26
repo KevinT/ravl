@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — extends 0004 from editing children to creating and removing them, and adds budgets so the cascade is bounded
 ---

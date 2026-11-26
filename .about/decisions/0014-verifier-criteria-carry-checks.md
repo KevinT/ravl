@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — written by the implementing agent while building the runner (first-loop steps 1 to 8), under the owner's instruction to build; implemented in 0.1.0; not yet reviewed by the decider"
   - "2026-11-26: Point 3 narrowed by 0018-a-loop-with-no-verifier-assumes-one-that-its-parent-edits: a loop with no criteria derives them from the intent on its first run, and records no-verifier only when that derivation does not succeed"

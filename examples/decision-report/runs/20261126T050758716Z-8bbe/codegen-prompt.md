@@ -49,7 +49,7 @@ but which the decider has not yet accepted.
 ## Run 20261126T050726191Z-dce7
 Summary: Wrote report.md with today's date, the count 5, and the headings of proposed decision records 0012-0016. The file was not checked against the verifier.
 Procedure:
-- cd /home/trek/Source/personal/ventures/ravl/examples/decision-report
+- cd /path/to/ravl/examples/decision-report
 - { date +%F; grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | wc -l; for f in $(grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | sort); do grep -m1 '^# Decision Record' "$f" | sed 's/^# //'; done; } > report.md
 Effects: report.md
 
@@ -64,7 +64,7 @@ Effects: report.md
 ## Run 20261126T050758716Z-8bbe
 Summary: Rewrote report.md with today's date, the count 5, and the headings of proposed decision records 0012-0016. I did not run the verifier checks.
 Procedure:
-- cd /home/trek/Source/personal/ventures/ravl/examples/decision-report
+- cd /path/to/ravl/examples/decision-report
 - Wrote report.md from: date +%F; grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | wc -l; for each matching file (sorted), grep -m1 '^# Decision Record' | sed 's/^# //'
 - cat report.md to confirm content
 Effects: report.md

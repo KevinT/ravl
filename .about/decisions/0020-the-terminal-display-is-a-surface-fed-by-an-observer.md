@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — the owner said the command's output was bare beside the first system's, which printed each phase in colour as it ran, and named two agent consoles as references. Built in 0.5.0 and shown to him as screenshots before any release"
 ---

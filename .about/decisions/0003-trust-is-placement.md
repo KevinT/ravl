@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — generalises RavlGPT's "read-anywhere, write-own" into a placement-inferred topology with a never-up rule
 ---

@@ -29,9 +29,14 @@ You are working in `ravl`. Before changing anything, read in this order:
 - **Small core.** Anything a capable model can do at run time from a clear contract is
   not framework code. Ask "must a model be prevented from improvising this?" — only if
   yes does it belong in the library.
+- **The repository stands alone.** Anyone can download it, use it and contribute to it
+  as its own thing. It does not depend on, and does not describe, any one person's
+  machine, tools or other systems. Another tool is named only as an example ("Hermes or
+  Claude, for example") or as a source that is credited.
 - **No private users in the repo.** No loop names, domain content or run artefacts from
   anyone's actual use of `ravl`, in files or in history. Examples are public and
-  invented.
+  invented. Before the runs of an example are committed, the absolute path of the
+  machine they were made on is replaced with `/path/to/ravl`.
 - **Say "LLM", not "AI".**
 - **Specification is driven by loops from here.** A run that contradicts the model
   produces a decision record and a model edit, not a workaround in code. Open

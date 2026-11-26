@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — written by the implementing agent after the owner asked for existing scheduled jobs to become loops that carry their purpose and their implementation, repair themselves within limits, and then come to him; implemented in 0.2.0; not yet reviewed by the decider"
 ---

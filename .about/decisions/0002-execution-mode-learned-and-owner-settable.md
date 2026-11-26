@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — replaces RavlGPT's separate code-generation and manual lock mechanisms with one learned property that the owner can override
 ---

@@ -44,7 +44,7 @@ llm (an LLM performed Act)
   "reported": true,
   "summary": "Wrote report.md with today's date, the count 5, and the headings of proposed decision records 0012-0016. The file was not checked against the verifier.",
   "procedure": [
-    "cd /home/trek/Source/personal/ventures/ravl/examples/decision-report",
+    "cd /path/to/ravl/examples/decision-report",
     "{ date +%F; grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | wc -l; for f in $(grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | sort); do grep -m1 '^# Decision Record' \"$f\" | sed 's/^# //'; done; } > report.md"
   ],
   "resources_used": [],

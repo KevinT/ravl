@@ -3,7 +3,7 @@ do the work the intent describes, then report. The runtime runs the verifier aft
 finish; a later phase records what was learned.
 
 # Loop directory (your working directory)
-/home/trek/Source/personal/ventures/ravl/examples/decision-report
+/path/to/ravl/examples/decision-report
 
 # Specification (ravl.md, written by the owner)
 # Report of proposed decision records

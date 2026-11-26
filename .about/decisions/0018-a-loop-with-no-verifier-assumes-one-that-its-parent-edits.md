@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — points 1, 2, 5 and 7 are the owner's statements in conversation (the file name and layout in point 2 are the implementing agent's); points 3 and 4 are choices the agent put to him and he approved with 'go'; point 6 is the agent's addition and was not put to him. Points 1 to 4 and 6 are implemented in 0.3.0. Point 5 for a parent that is a loop is not built: no loop has a parent loop yet. Not yet read by the decider in this written form"
 ---

@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — narrows scope from "any task" to outcomes that recur, after assessing ravl against interactive agents, agent memory and multi-agent frameworks
 ---

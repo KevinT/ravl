@@ -44,7 +44,7 @@
     "question": null,
     "reason": "Verify passed after Act: report.md exists, was written this run, and its date, count and heading lines all match the criteria."
   },
-  "loop": "/home/trek/Source/personal/ventures/ravl/examples/decision-report",
+  "loop": "/path/to/ravl/examples/decision-report",
   "ravl_version": "0.1.0",
   "reflect": {
     "answers": [],

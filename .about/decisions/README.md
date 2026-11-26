@@ -9,7 +9,8 @@ force, nearest scope first.
 - Files are `NNNN-short-noun-phrase.md`, numbered from `0000` within this scope.
   Reference records by full slug, never bare number.
 - Frontmatter: `status` (Proposed / Accepted / Superseded / Rejected), `date`,
-  `deciders`, `history` (one dated line per status change).
+  `deciders` (who decides: for this repository its maintainer, `kevint@gmail.com`),
+  `history` (one dated line per status change).
 - Body: `## Context`, `## Decision`, `## Alternatives considered` (table),
   `## Consequences`, `## Related` (records in this scope or an ancestor only).
 - A record is written *before* the thing it decides is built. Proposed records are

@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — rejects child-to-parent signalling in favour of parents deciding how to observe their children
 ---

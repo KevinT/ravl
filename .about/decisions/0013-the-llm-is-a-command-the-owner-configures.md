@@ -1,7 +1,7 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - "2026-11-26: Proposed — written by the implementing agent while building the runner (first-loop steps 1 to 8), under the owner's instruction to build; implemented in 0.1.0; not yet reviewed by the decider"
   - "2026-11-26: Point 5 changed by 0019-agent-programs-are-backends-chosen-with-ravl-config: adapters for particular agents ship in the package under ravl.backends and are named with `[llm] backend`; a command still takes precedence"

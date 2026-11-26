@@ -34,7 +34,7 @@
     "question": null,
     "reason": ""
   },
-  "loop": "/home/trek/Source/personal/ventures/ravl/examples/decision-report",
+  "loop": "/path/to/ravl/examples/decision-report",
   "ravl_version": "0.1.0",
   "reflect": {
     "answers": [],

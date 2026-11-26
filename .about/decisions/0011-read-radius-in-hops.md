@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — makes the read rule in 0003 quantitative and assigns narrowing to the loop and widening to the owner
 ---

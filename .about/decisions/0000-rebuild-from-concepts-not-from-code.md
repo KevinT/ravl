@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — after a review of RavlGPT's mission, achievement and code, chose a fresh repository over an in-place refactor
 ---

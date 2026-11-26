@@ -11,7 +11,7 @@
     "needs_owner": null,
     "ok": true,
     "procedure": [
-      "cd /home/trek/Source/personal/ventures/ravl/examples/decision-report",
+      "cd /path/to/ravl/examples/decision-report",
       "Wrote report.md from: date +%F; grep -l '^status: Proposed' ../../.about/decisions/[0-9]*.md | wc -l; for each matching file (sorted), grep -m1 '^# Decision Record' | sed 's/^# //'",
       "cat report.md to confirm content"
     ],
@@ -48,7 +48,7 @@
     "question": null,
     "reason": "The verifier after Act passed all four checks; the pre-Act failure was only that report.md had not yet been written in this run."
   },
-  "loop": "/home/trek/Source/personal/ventures/ravl/examples/decision-report",
+  "loop": "/path/to/ravl/examples/decision-report",
   "ravl_version": "0.1.0",
   "reflect": {
     "answers": [],

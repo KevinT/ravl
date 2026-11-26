@@ -1,7 +1,7 @@
 ---
 status: Accepted
 date: 2026-09-23
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
   - 2026-09-23: Accepted — required so that loops run for different parties cannot read each other's learnings, and so the library can be public while its uses are private
 ---

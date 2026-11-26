@@ -1,9 +1,9 @@
 ---
 status: Proposed
 date: 2026-11-26
-deciders: [k@wetware.works]
+deciders: [kevint@gmail.com]
 history:
-  - "2026-11-26: Proposed — the owner asked for `ravl config`, said ravl must not assume that Hermes or Claude is installed, asked that setup be as smooth as possible by supporting the standard options, and pointed at Hermes Agent's handling of providers as something to reuse. He approved building 'detection and the installed-agent backends first' before reading this text. Implemented in 0.4.0 for two programs, of which Claude Code has been run end to end and Codex has not; the backend for a bare API key and the sandbox are separate records still to be written"
+  - "2026-11-26: Proposed — the owner asked for `ravl config`, said ravl must not assume that any particular agent program is installed (Hermes or Claude, for example), asked that setup be as smooth as possible by supporting the standard options, and pointed at the open-source Hermes Agent's handling of providers as something to reuse. He approved building 'detection and the installed-agent backends first' before reading this text. Implemented in 0.4.0 for two programs, of which Claude Code has been run end to end and Codex has not; the backend for a bare API key and the sandbox are separate records still to be written"
 ---
 
 # Decision Record 0019: Agent programs are backends shipped in the package and chosen with `ravl config`
